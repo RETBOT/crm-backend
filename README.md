@@ -21,6 +21,7 @@ npm run dev
 ## Endpoints
 
 - `GET /api/health`
+- `GET /api/dashboard/home` (Bearer token)
 - `POST /api/login/access`
 - `POST /api/login/refresh_token`
 - `POST /api/login/forgotpwd`
