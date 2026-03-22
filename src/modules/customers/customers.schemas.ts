@@ -12,7 +12,7 @@ export const customersSchema = z.object({
 });
 
 export const contactsSchema = z.object({
-  CLIENTEID: z.union([z.string(), z.number()]).transform((v) => String(v)),
+  CLIENTEID: z.union([z.string(), z.number()]).optional().nullable().transform((v) => v != null ? String(v) : ""),
 });
 
 export const contactsAbcSchema = z.object({

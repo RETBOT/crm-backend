@@ -155,27 +155,33 @@ export async function listCustomers(companyId: number, userId: number, input: Cu
 export async function listContacts(companyId: number, userId: number, input: ContactsInput) {
   const pool = await getPool();
   const scope = await resolveUserScope(companyId, userId);
+
+  const hasCustomer = input.CLIENTEID && input.CLIENTEID !== "" && input.CLIENTEID !== "0";
+  const whereCustomer = hasCustomer ? "AND v.customer_id = @customer_id" : "";
+
   const result = await pool
     .request()
     .input("company_id", sql.Int, companyId)
     .input("scope_type", sql.VarChar(10), scope.scopeType)
     .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
     .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
-    .input("clienteid", sql.VarChar(30), input.CLIENTEID)
+    .input("customer_id", sql.Int, hasCustomer ? Number(input.CLIENTEID) : null)
     .query(`
-      SELECT ID, NOMBRE, APATERNO, AMATERNO, TELEFONO, EXTENSION, PUESTOID, PUESTO, COMENTARIOS, WHATSAPP, EMAIL
-      FROM api.vw_cn_contactos
-      WHERE company_id = @company_id
-        AND CLIENTEID = @clienteid
+      SELECT v.ID, v.CLIENTEID, c.customer_name AS NOMBRECLI, v.NOMBRE, v.APATERNO, v.AMATERNO,
+             v.TELEFONO, v.EXTENSION, v.PUESTOID, v.PUESTO, v.COMENTARIOS, v.WHATSAPP, v.EMAIL
+      FROM api.vw_cn_contactos v
+      INNER JOIN crm.customers c ON c.company_id = v.company_id AND c.customer_id = v.customer_id
+      WHERE v.company_id = @company_id
+        ${whereCustomer}
         AND EXISTS (
           SELECT 1
           FROM crm.customers cscope
-          WHERE cscope.company_id = api.vw_cn_contactos.company_id
-            AND cscope.customer_id = api.vw_cn_contactos.customer_id
+          WHERE cscope.company_id = v.company_id
+            AND cscope.customer_id = v.customer_id
             AND ${buildScopeConditionSql("cscope")}
         )
-        AND is_active = 1
-      ORDER BY NOMBRE, APATERNO, AMATERNO;
+        AND v.is_active = 1
+      ORDER BY c.customer_name, v.NOMBRE, v.APATERNO;
     `);
 
   return result.recordset;
