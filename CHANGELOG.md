@@ -7,6 +7,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Sistema de notificaciones con tabla `crm.notifications`
+- `GET /api/notifications` - listar notificaciones del usuario (con generacion on-demand de due_soon y overdue)
+- `GET /api/notifications/badge` - contador de no leidas
+- `PUT /api/notifications/:id/read` - marcar como leida
+- `PUT /api/notifications/read-all` - marcar todas como leidas
+- Notificacion automatica al asignar actividad a otro usuario
+- Generacion on-demand de notificaciones: `due_soon` (4h antes) y `overdue` (vencidas)
 - Permiso `activities.assign` para asignar actividades a otros usuarios
 - Endpoint `GET /cn/actividades_usuarios` para listar usuarios de la sucursal
 - `OWNER_USER_ID` opcional en `activityCreateSchema`

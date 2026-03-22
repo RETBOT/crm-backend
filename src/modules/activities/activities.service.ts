@@ -1,6 +1,7 @@
 import { getPool, sql } from "../../db/sqlserver";
 import { HttpError } from "../../shared/http-error";
 import { resolveUserScope } from "../scope/scope.service";
+import { createAssignedNotification } from "../notifications/notifications.service";
 import {
   ActivitiesListInput,
   ActivityCompleteInput,
@@ -198,7 +199,7 @@ export async function createActivity(companyId: number, userId: number, input: A
     }
   }
 
-  await pool
+  const insertResult = await pool
     .request()
     .input("company_id", sql.Int, companyId)
     .input("customer_id", sql.Int, input.CUSTOMER_ID)
@@ -211,15 +212,35 @@ export async function createActivity(companyId: number, userId: number, input: A
     .input("due_at", sql.DateTime2, input.DUE_AT ? new Date(input.DUE_AT) : null)
     .input("status", sql.VarChar(20), input.DUE_AT ? "Programada" : "Pendiente")
     .input("priority_code", sql.VarChar(10), input.PRIORITY)
-    .query(`
+    .query<{ activity_id: number }>(`
       INSERT INTO crm.activities (
         company_id, customer_id, contact_id, opportunity_id, owner_user_id,
         activity_type_code, subject, notes, due_at, status, priority_code
-      ) VALUES (
+      ) OUTPUT INSERTED.activity_id VALUES (
         @company_id, @customer_id, @contact_id, @opportunity_id, @owner_user_id,
         @activity_type_code, @subject, @notes, @due_at, @status, @priority_code
       );
     `);
+
+  const newActivityId = insertResult.recordset[0].activity_id;
+
+  if (ownerId !== userId) {
+    const creatorResult = await pool
+      .request()
+      .input("company_id", sql.Int, companyId)
+      .input("user_id", sql.Int, userId)
+      .query<{ display_name: string }>(`
+        SELECT display_name FROM sec.users WHERE company_id = @company_id AND user_id = @user_id;
+      `);
+
+    const creatorName = creatorResult.recordset[0]?.display_name || "Un usuario";
+
+    try {
+      await createAssignedNotification(companyId, ownerId, newActivityId, input.SUBJECT, creatorName);
+    } catch {
+      // no bloquear la creacion si falla la notificacion
+    }
+  }
 
   return "Actividad creada correctamente";
 }
