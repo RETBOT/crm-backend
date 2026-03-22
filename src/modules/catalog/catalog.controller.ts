@@ -85,3 +85,23 @@ export async function getRutas(req: Request, res: Response): Promise<void> {
 
   res.json(result.recordset);
 }
+
+export async function getPuestos(req: Request, res: Response): Promise<void> {
+  const { DESCRIPCION } = querySchema.parse(req.body ?? {});
+  const pool = await getPool();
+
+  const result = await pool
+    .request()
+    .input("search", sql.NVarChar(120), `%${DESCRIPCION || ""}%`)
+    .query(`
+      SELECT
+        position_code AS ID,
+        position_name AS DSC
+      FROM cat.positions
+      WHERE is_active = 1
+        AND (@search = '%%' OR position_name LIKE @search)
+      ORDER BY position_name;
+    `);
+
+  res.json(result.recordset);
+}
