@@ -12,6 +12,9 @@ import {
   putAdminUserScope,
   putAdminRolePermissions,
   putAdminUserRoles,
+  postAdminCreatePermission,
+  putAdminPermission,
+  deleteAdminPermission,
 } from "./admin.controller";
 import { requireAnyPermission, requirePermission } from "../../middlewares/permissions";
 import { PERMISSIONS } from "../auth/permissions";
@@ -46,5 +49,8 @@ router.post("/users", requirePermission(PERMISSIONS.USERS_MANAGE), postAdminCrea
 router.put("/users/:userId/roles", requirePermission(PERMISSIONS.ROLES_MANAGE), putAdminUserRoles);
 router.get("/users/:userId/scope", requirePermission(PERMISSIONS.SCOPE_MANAGE), getAdminUserScope);
 router.put("/users/:userId/scope", requirePermission(PERMISSIONS.SCOPE_MANAGE), putAdminUserScope);
+router.post("/permissions", requirePermission(PERMISSIONS.ROLES_MANAGE), postAdminCreatePermission);
+router.put("/permissions/:permissionId", requirePermission(PERMISSIONS.ROLES_MANAGE), putAdminPermission);
+router.delete("/permissions/:permissionId", requirePermission(PERMISSIONS.ROLES_MANAGE), deleteAdminPermission);
 
 export { router as adminRoutes };

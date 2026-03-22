@@ -5,6 +5,8 @@ import {
   upsertUserScopeSchema,
   updateRolePermissionsSchema,
   updateUserRolesSchema,
+  createPermissionSchema,
+  updatePermissionSchema,
 } from "./admin.schemas";
 import {
   createRole,
@@ -19,6 +21,9 @@ import {
   upsertUserScope,
   updateRolePermissions,
   updateUserRoles,
+  createPermission,
+  updatePermission,
+  deletePermission,
 } from "./admin.service";
 
 export async function getAdminPermissions(_req: Request, res: Response): Promise<void> {
@@ -95,4 +100,23 @@ export async function putAdminUserScope(req: Request, res: Response): Promise<vo
   const parsed = upsertUserScopeSchema.parse(req.body ?? {});
   await upsertUserScope(req.auth!.companyId, userId, parsed);
   res.json({ ok: true, message: "Alcance de datos actualizado correctamente" });
+}
+
+export async function postAdminCreatePermission(req: Request, res: Response): Promise<void> {
+  const parsed = createPermissionSchema.parse(req.body ?? {});
+  const permissionId = await createPermission(parsed);
+  res.status(201).json({ ok: true, permission_id: permissionId, message: "Permiso creado correctamente" });
+}
+
+export async function putAdminPermission(req: Request, res: Response): Promise<void> {
+  const permissionId = Number(req.params.permissionId);
+  const parsed = updatePermissionSchema.parse(req.body ?? {});
+  await updatePermission(permissionId, parsed);
+  res.json({ ok: true, message: "Permiso actualizado correctamente" });
+}
+
+export async function deleteAdminPermission(req: Request, res: Response): Promise<void> {
+  const permissionId = Number(req.params.permissionId);
+  await deletePermission(permissionId);
+  res.json({ ok: true, message: "Permiso eliminado correctamente" });
 }

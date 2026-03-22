@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { getPool, sql } from "../../db/sqlserver";
 import { HttpError } from "../../shared/http-error";
-import { CreateRoleInput, CreateUserInput, UpsertUserScopeInput } from "./admin.schemas";
+import { CreateRoleInput, CreateUserInput, UpsertUserScopeInput, CreatePermissionInput, UpdatePermissionInput } from "./admin.schemas";
 import { resolveUserScope } from "../scope/scope.service";
 
 export async function listPermissions() {
@@ -557,6 +557,114 @@ export async function deleteRole(companyId: number, roleId: number) {
       `);
 
     await tx.commit();
+  } catch (error) {
+    await tx.rollback();
+    throw error;
+  }
+}
+
+export async function createPermission(input: CreatePermissionInput) {
+  const pool = await getPool();
+
+  try {
+    const result = await pool
+      .request()
+      .input("permission_key", sql.VarChar(80), input.permission_key)
+      .input("permission_description", sql.NVarChar(200), input.permission_description)
+      .query<{ permission_id: number }>(`
+        INSERT INTO sec.permissions (permission_key, permission_description)
+        OUTPUT INSERTED.permission_id
+        VALUES (@permission_key, @permission_description);
+      `);
+
+    return result.recordset[0].permission_id;
+  } catch (error: any) {
+    if (error?.message?.includes("UQ_permissions_permission_key") || error?.message?.includes("duplicate")) {
+      throw new HttpError(400, "Ya existe un permiso con esa clave");
+    }
+    throw error;
+  }
+}
+
+export async function updatePermission(permissionId: number, input: UpdatePermissionInput) {
+  const pool = await getPool();
+
+  const existing = await pool
+    .request()
+    .input("permission_id", sql.Int, permissionId)
+    .query<{ permission_id: number }>(`
+      SELECT permission_id FROM sec.permissions WHERE permission_id = @permission_id;
+    `);
+
+  if (!existing.recordset[0]) {
+    throw new HttpError(404, "Permiso no encontrado");
+  }
+
+  const sets: string[] = [];
+
+  if (input.permission_key !== undefined) {
+    sets.push("permission_key = @permission_key");
+  }
+  if (input.permission_description !== undefined) {
+    sets.push("permission_description = @permission_description");
+  }
+
+  if (sets.length === 0) {
+    throw new HttpError(400, "No hay cambios para actualizar");
+  }
+
+  try {
+    const req = pool.request().input("permission_id", sql.Int, permissionId);
+
+    if (input.permission_key !== undefined) {
+      req.input("permission_key", sql.VarChar(80), input.permission_key);
+    }
+    if (input.permission_description !== undefined) {
+      req.input("permission_description", sql.NVarChar(200), input.permission_description);
+    }
+
+    await req.query(`
+      UPDATE sec.permissions SET ${sets.join(", ")}
+      WHERE permission_id = @permission_id;
+    `);
+  } catch (error: any) {
+    if (error?.message?.includes("UQ_permissions_permission_key") || error?.message?.includes("duplicate")) {
+      throw new HttpError(400, "Ya existe un permiso con esa clave");
+    }
+    throw error;
+  }
+}
+
+export async function deletePermission(permissionId: number) {
+  const pool = await getPool();
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+
+  try {
+    const existing = await new sql.Request(tx)
+      .input("permission_id", sql.Int, permissionId)
+      .query<{ permission_key: string }>(`
+        SELECT permission_key FROM sec.permissions WHERE permission_id = @permission_id;
+      `);
+
+    if (!existing.recordset[0]) {
+      throw new HttpError(404, "Permiso no encontrado");
+    }
+
+    await new sql.Request(tx)
+      .input("permission_id", sql.Int, permissionId)
+      .query(`
+        DELETE FROM sec.role_permissions WHERE permission_id = @permission_id;
+      `);
+
+    await new sql.Request(tx)
+      .input("permission_id", sql.Int, permissionId)
+      .query(`
+        DELETE FROM sec.permissions WHERE permission_id = @permission_id;
+      `);
+
+    await tx.commit();
+    return existing.recordset[0].permission_key;
   } catch (error) {
     await tx.rollback();
     throw error;

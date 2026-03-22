@@ -86,7 +86,9 @@ export async function listActivities(companyId: number, userId: number, input: A
   const offset = (page - 1) * pageSize;
 
   const whereCustomer = input.CUSTOMER_ID ? "AND a.customer_id = @customer_id" : "";
-  const whereStatus = input.STATUS ? "AND a.status = @status" : "";
+  const whereStatus = input.STATUS === "VENCIDA"
+    ? "AND a.status IN ('Pendiente','Programada') AND a.due_at IS NOT NULL AND a.due_at < SYSUTCDATETIME()"
+    : input.STATUS ? "AND a.status = @status" : "";
   const whereType = input.TYPE ? "AND a.activity_type_code = @type" : "";
   const whereSearch = input.SEARCH ? "AND (a.subject LIKE @search OR a.notes LIKE @search)" : "";
 
@@ -190,7 +192,7 @@ export async function createActivity(companyId: number, userId: number, input: A
     .input("subject", sql.NVarChar(200), input.SUBJECT)
     .input("notes", sql.NVarChar(1000), input.NOTES || "")
     .input("due_at", sql.DateTime2, input.DUE_AT ? new Date(input.DUE_AT) : null)
-    .input("status", sql.VarChar(20), "Pendiente")
+    .input("status", sql.VarChar(20), input.DUE_AT ? "Programada" : "Pendiente")
     .input("priority_code", sql.VarChar(10), input.PRIORITY)
     .query(`
       INSERT INTO crm.activities (
@@ -212,8 +214,8 @@ export async function updateActivity(companyId: number, userId: number, input: A
     .request()
     .input("company_id", sql.Int, companyId)
     .input("activity_id", sql.Int, input.ACTIVITY_ID)
-    .query<{ customer_id: number }>(`
-      SELECT customer_id
+    .query<{ customer_id: number; status: string }>(`
+      SELECT customer_id, status
       FROM crm.activities
       WHERE company_id = @company_id AND activity_id = @activity_id;
     `);
@@ -223,6 +225,10 @@ export async function updateActivity(companyId: number, userId: number, input: A
   }
 
   await assertCustomerInScope(companyId, userId, existing.recordset[0].customer_id);
+
+  const currentStatus = existing.recordset[0].status;
+  const isActive = currentStatus === "Pendiente" || currentStatus === "Programada";
+  const newStatus = isActive ? (input.DUE_AT ? "Programada" : "Pendiente") : currentStatus;
 
   await pool
     .request()
@@ -235,6 +241,7 @@ export async function updateActivity(companyId: number, userId: number, input: A
     .input("notes", sql.NVarChar(1000), input.NOTES || "")
     .input("due_at", sql.DateTime2, input.DUE_AT ? new Date(input.DUE_AT) : null)
     .input("priority_code", sql.VarChar(10), input.PRIORITY)
+    .input("status", sql.VarChar(20), newStatus)
     .query(`
       UPDATE crm.activities
          SET contact_id = @contact_id,
@@ -244,6 +251,7 @@ export async function updateActivity(companyId: number, userId: number, input: A
              notes = @notes,
              due_at = @due_at,
              priority_code = @priority_code,
+             status = @status,
              updated_at = SYSUTCDATETIME()
        WHERE company_id = @company_id
          AND activity_id = @activity_id;

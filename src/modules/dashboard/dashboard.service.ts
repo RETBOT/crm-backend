@@ -273,3 +273,61 @@ export async function getHomeDashboardData(companyId: number, userId: number) {
     generated_at: new Date().toISOString(),
   };
 }
+
+export async function getOverdueActivities(companyId: number, userId: number) {
+  const pool = await getPool();
+  const scope = await resolveUserScope(companyId, userId);
+
+  const result = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("scope_type", sql.VarChar(10), scope.scopeType)
+    .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
+    .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
+    .query<{
+      activity_id: number;
+      subject: string;
+      customer_name: string;
+      due_at: Date;
+      activity_type_code: string;
+      days_overdue: number;
+    }>(`
+      SELECT TOP 10
+        a.activity_id,
+        a.subject,
+        c.customer_name,
+        a.due_at,
+        a.activity_type_code,
+        DATEDIFF(DAY, a.due_at, SYSUTCDATETIME()) AS days_overdue
+      FROM crm.activities a
+      INNER JOIN crm.customers c ON c.company_id = a.company_id AND c.customer_id = a.customer_id
+      WHERE a.company_id = @company_id
+        AND a.status IN ('Pendiente', 'Programada')
+        AND a.due_at IS NOT NULL
+        AND a.due_at < SYSUTCDATETIME()
+        AND (
+          @scope_type = 'ALL'
+          OR (
+            c.branch_id IN (
+              SELECT TRY_CAST(value AS INT)
+              FROM STRING_SPLIT(@branch_ids_csv, ',')
+              WHERE TRY_CAST(value AS INT) IS NOT NULL
+            )
+            AND (
+              @scope_type = 'BRANCH'
+              OR c.route_id IN (
+                SELECT TRY_CAST(value AS INT)
+                FROM STRING_SPLIT(@route_ids_csv, ',')
+                WHERE TRY_CAST(value AS INT) IS NOT NULL
+              )
+            )
+          )
+        )
+      ORDER BY a.due_at ASC;
+    `);
+
+  return {
+    count: result.recordset.length,
+    items: result.recordset,
+  };
+}

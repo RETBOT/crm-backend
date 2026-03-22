@@ -31,8 +31,20 @@ export const upsertUserScopeSchema = z.object({
   route_ids: z.array(z.coerce.number().int().positive()).default([]),
 });
 
+export const createPermissionSchema = z.object({
+  permission_key: z.string().min(3).max(80).regex(/^[a-z_]+\.[a-z_]+$/, "Formato: categoria.accion (ej: reports.export)"),
+  permission_description: z.string().min(1).max(200),
+});
+
+export const updatePermissionSchema = z.object({
+  permission_key: z.string().min(3).max(80).regex(/^[a-z_]+\.[a-z_]+$/, "Formato: categoria.accion").optional(),
+  permission_description: z.string().min(1).max(200).optional(),
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserRolesInput = z.infer<typeof updateUserRolesSchema>;
 export type CreateRoleInput = z.infer<typeof createRoleSchema>;
 export type UpdateRolePermissionsInput = z.infer<typeof updateRolePermissionsSchema>;
 export type UpsertUserScopeInput = z.infer<typeof upsertUserScopeSchema>;
+export type CreatePermissionInput = z.infer<typeof createPermissionSchema>;
+export type UpdatePermissionInput = z.infer<typeof updatePermissionSchema>;
