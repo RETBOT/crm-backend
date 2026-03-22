@@ -35,16 +35,20 @@ function buildScopeConditionSql(alias: string): string {
 async function assertCustomerInScope(
   companyId: number,
   userId: number,
-  customerCode: string,
+  clientId: string,
   scope?: EffectiveScope
 ): Promise<number> {
   const pool = await getPool();
   const resolvedScope = scope ?? (await resolveUserScope(companyId, userId));
 
+  const numericId = Number(clientId);
+  const isNumeric = !isNaN(numericId) && clientId.trim() !== "";
+
   const result = await pool
     .request()
     .input("company_id", sql.Int, companyId)
-    .input("customer_code", sql.VarChar(30), customerCode)
+    .input("client_id", sql.Int, isNumeric ? numericId : null)
+    .input("client_code", sql.VarChar(30), isNumeric ? null : clientId)
     .input("scope_type", sql.VarChar(10), resolvedScope.scopeType)
     .input("branch_ids_csv", sql.VarChar(sql.MAX), resolvedScope.branchIdsCsv)
     .input("route_ids_csv", sql.VarChar(sql.MAX), resolvedScope.routeIdsCsv)
@@ -52,7 +56,10 @@ async function assertCustomerInScope(
       SELECT c.customer_id
       FROM crm.customers c
       WHERE c.company_id = @company_id
-        AND c.customer_code = @customer_code
+        AND (
+          (@client_id IS NOT NULL AND c.customer_id = @client_id)
+          OR (@client_code IS NOT NULL AND c.customer_code = @client_code)
+        )
         AND ${buildScopeConditionSql("c")};
     `);
 
