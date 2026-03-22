@@ -9,4 +9,7 @@ export const PERMISSIONS = {
   PROSPECTS_UPDATE: "prospects.update",
   PROSPECTS_DELETE: "prospects.delete",
   PROSPECTS_CONVERT: "prospects.convert",
+  ACTIVITIES_CREATE: "activities.create",
+  ACTIVITIES_UPDATE: "activities.update",
+  ACTIVITIES_COMPLETE: "activities.complete",
 } as const;

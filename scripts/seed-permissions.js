@@ -31,6 +31,9 @@ async function run() {
     ["prospects.update", "Actualizar prospectos"],
     ["prospects.delete", "Inactivar prospectos"],
     ["prospects.convert", "Convertir prospectos a cliente"],
+    ["activities.create", "Crear actividades"],
+    ["activities.update", "Actualizar actividades"],
+    ["activities.complete", "Completar/cancelar actividades"],
   ];
 
   for (const [key, desc] of permissions) {

@@ -49,6 +49,18 @@ INSERT INTO sec.permissions (permission_key, permission_description)
 SELECT 'prospects.convert', N'Convertir prospectos a cliente'
 WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'prospects.convert');
 
+INSERT INTO sec.permissions (permission_key, permission_description)
+SELECT 'activities.create', N'Crear actividades'
+WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'activities.create');
+
+INSERT INTO sec.permissions (permission_key, permission_description)
+SELECT 'activities.update', N'Actualizar actividades'
+WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'activities.update');
+
+INSERT INTO sec.permissions (permission_key, permission_description)
+SELECT 'activities.complete', N'Completar/cancelar actividades'
+WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'activities.complete');
+
 INSERT INTO sec.roles (company_id, role_name, role_description, is_active)
 SELECT @company_id, 'admin', N'Administrador general', 1
 WHERE NOT EXISTS (
@@ -83,7 +95,8 @@ FROM sec.permissions p
 WHERE p.permission_key IN (
   'users.manage', 'roles.manage', 'scope.manage',
   'customers.create', 'customers.update', 'customers.delete',
-  'prospects.create', 'prospects.update', 'prospects.delete', 'prospects.convert'
+  'prospects.create', 'prospects.update', 'prospects.delete', 'prospects.convert',
+  'activities.create', 'activities.update', 'activities.complete'
 )
 AND NOT EXISTS (
   SELECT 1 FROM sec.role_permissions rp WHERE rp.role_id = @role_admin AND rp.permission_id = p.permission_id
