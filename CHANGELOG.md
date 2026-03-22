@@ -7,7 +7,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- (proxima feature)
+- Permiso `activities.assign` para asignar actividades a otros usuarios
+- Endpoint `GET /cn/actividades_usuarios` para listar usuarios de la sucursal
+- `OWNER_USER_ID` opcional en `activityCreateSchema`
+- `getUsersForAssignment()` en service: filtra usuarios activos por scope del creador
+
+### Changed
+- `createActivity` acepta parametro `canAssign` y `OWNER_USER_ID` opcional
+- Si usuario tiene `activities.assign` y envia `OWNER_USER_ID`, se asigna a ese usuario
+- Si no, se asigna al usuario que crea la actividad (comportamiento actual)
 
 ---
 

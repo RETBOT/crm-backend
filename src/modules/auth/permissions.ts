@@ -12,4 +12,5 @@ export const PERMISSIONS = {
   ACTIVITIES_CREATE: "activities.create",
   ACTIVITIES_UPDATE: "activities.update",
   ACTIVITIES_COMPLETE: "activities.complete",
+  ACTIVITIES_ASSIGN: "activities.assign",
 } as const;

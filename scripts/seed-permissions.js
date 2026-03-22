@@ -34,6 +34,7 @@ async function run() {
     ["activities.create", "Crear actividades"],
     ["activities.update", "Actualizar actividades"],
     ["activities.complete", "Completar/cancelar actividades"],
+    ["activities.assign", "Asignar actividades a otros usuarios"],
   ];
 
   for (const [key, desc] of permissions) {

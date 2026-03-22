@@ -176,10 +176,27 @@ export async function listActivities(companyId: number, userId: number, input: A
   };
 }
 
-export async function createActivity(companyId: number, userId: number, input: ActivityCreateInput): Promise<string> {
+export async function createActivity(companyId: number, userId: number, input: ActivityCreateInput, canAssign: boolean): Promise<string> {
   const pool = await getPool();
 
   await assertCustomerInScope(companyId, userId, input.CUSTOMER_ID);
+
+  const ownerId = canAssign && input.OWNER_USER_ID ? input.OWNER_USER_ID : userId;
+
+  if (canAssign && input.OWNER_USER_ID) {
+    const userCheck = await pool
+      .request()
+      .input("company_id", sql.Int, companyId)
+      .input("user_id", sql.Int, input.OWNER_USER_ID)
+      .query<{ user_id: number }>(`
+        SELECT user_id FROM sec.users
+        WHERE company_id = @company_id AND user_id = @user_id AND is_active = 1;
+      `);
+
+    if (!userCheck.recordset[0]) {
+      throw new HttpError(400, "El usuario asignado no existe o esta inactivo");
+    }
+  }
 
   await pool
     .request()
@@ -187,7 +204,7 @@ export async function createActivity(companyId: number, userId: number, input: A
     .input("customer_id", sql.Int, input.CUSTOMER_ID)
     .input("contact_id", sql.Int, input.CONTACT_ID ?? null)
     .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID ?? null)
-    .input("owner_user_id", sql.Int, userId)
+    .input("owner_user_id", sql.Int, ownerId)
     .input("activity_type_code", sql.VarChar(20), input.TYPE)
     .input("subject", sql.NVarChar(200), input.SUBJECT)
     .input("notes", sql.NVarChar(1000), input.NOTES || "")
@@ -309,6 +326,39 @@ export async function getActivityTypes() {
     WHERE is_active = 1
     ORDER BY activity_type_name;
   `);
+
+  return result.recordset;
+}
+
+export async function getUsersForAssignment(companyId: number, userId: number) {
+  const pool = await getPool();
+  const scope = await resolveUserScope(companyId, userId);
+
+  const result = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("scope_type", sql.VarChar(10), scope.scopeType)
+    .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
+    .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
+    .query<{ user_id: number; display_name: string; branch_name: string }>(`
+      SELECT DISTINCT
+        u.user_id,
+        u.display_name,
+        b.branch_name
+      FROM sec.users u
+      LEFT JOIN crm.branches b ON b.company_id = u.company_id AND b.branch_id = u.default_branch_id
+      WHERE u.company_id = @company_id
+        AND u.is_active = 1
+        AND (
+          @scope_type = 'ALL'
+          OR u.default_branch_id IN (
+            SELECT TRY_CAST(value AS INT)
+            FROM STRING_SPLIT(@branch_ids_csv, ',')
+            WHERE TRY_CAST(value AS INT) IS NOT NULL
+          )
+        )
+      ORDER BY u.display_name;
+    `);
 
   return result.recordset;
 }

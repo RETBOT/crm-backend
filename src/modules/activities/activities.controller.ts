@@ -11,6 +11,7 @@ import {
   completeActivity,
   createActivity,
   getActivityTypes,
+  getUsersForAssignment,
   listActivities,
   updateActivity,
 } from "./activities.service";
@@ -34,7 +35,8 @@ export async function postCreateActivity(req: Request, res: Response): Promise<v
       return;
     }
 
-    const msg = await createActivity(req.auth!.companyId, req.auth!.userId, input);
+    const canAssign = hasPermission(req, PERMISSIONS.ACTIVITIES_ASSIGN);
+    const msg = await createActivity(req.auth!.companyId, req.auth!.userId, input, canAssign);
     res.json(abcSuccess(msg));
   } catch (error) {
     const msg = error instanceof Error ? error.message : "No se pudo crear la actividad";
@@ -79,4 +81,14 @@ export async function postCompleteActivity(req: Request, res: Response): Promise
 export async function getActivityTypesHandler(_req: Request, res: Response): Promise<void> {
   const data = await getActivityTypes();
   res.json(data);
+}
+
+export async function getActivityUsersHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const data = await getUsersForAssignment(req.auth!.companyId, req.auth!.userId);
+    res.json(data);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "No se pudieron obtener los usuarios";
+    res.status(400).json(abcError(msg));
+  }
 }

@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getActivities,
   getActivityTypesHandler,
+  getActivityUsersHandler,
   postCompleteActivity,
   postCreateActivity,
   postUpdateActivity,
@@ -14,5 +15,6 @@ router.post("/actividades_crear", postCreateActivity);
 router.post("/actividades_actualizar", postUpdateActivity);
 router.post("/actividades_completar", postCompleteActivity);
 router.get("/actividades_tipos", getActivityTypesHandler);
+router.get("/actividades_usuarios", getActivityUsersHandler);
 
 export { router as activitiesRoutes };

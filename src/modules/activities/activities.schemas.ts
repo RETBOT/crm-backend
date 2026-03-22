@@ -14,6 +14,7 @@ export const activityCreateSchema = z
     CUSTOMER_ID: z.coerce.number(),
     CONTACT_ID: z.coerce.number().optional().nullable(),
     OPPORTUNITY_ID: z.coerce.number().optional().nullable(),
+    OWNER_USER_ID: z.coerce.number().optional().nullable(),
     TYPE: z.string().min(1, "Tipo es requerido"),
     SUBJECT: z.string().min(1, "Asunto es requerido"),
     NOTES: z.string().optional().default(""),
