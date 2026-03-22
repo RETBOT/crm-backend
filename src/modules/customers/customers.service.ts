@@ -167,7 +167,7 @@ export async function listContacts(companyId: number, userId: number, input: Con
     .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
     .input("customer_id", sql.Int, hasCustomer ? Number(input.CLIENTEID) : null)
     .query(`
-      SELECT v.ID, v.CLIENTEID, c.customer_name AS NOMBRECLI, v.NOMBRE, v.APATERNO, v.AMATERNO,
+      SELECT v.ID, c.customer_id, v.CLIENTEID, c.customer_name AS NOMBRECLI, v.NOMBRE, v.APATERNO, v.AMATERNO,
              v.TELEFONO, v.EXTENSION, v.PUESTOID, v.PUESTO, v.COMENTARIOS, v.WHATSAPP, v.EMAIL
       FROM api.vw_cn_contactos v
       INNER JOIN crm.customers c ON c.company_id = v.company_id AND c.customer_id = v.customer_id
