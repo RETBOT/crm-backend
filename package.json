@@ -13,7 +13,8 @@
     "scope:setup": "node scripts/scope-setup.js",
     "password:check": "node scripts/check-password.js",
     "password:reset": "node scripts/reset-password.js",
-    "user:create-no-perms": "node scripts/create-no-permissions-user.js"
+    "user:create-no-perms": "node scripts/create-no-permissions-user.js",
+    "docs:check": "node scripts/doc-check.js"
   },
   "keywords": [],
   "author": "",
