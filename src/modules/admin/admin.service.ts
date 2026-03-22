@@ -670,3 +670,39 @@ export async function deletePermission(permissionId: number) {
     throw error;
   }
 }
+
+export async function resetUserPassword(companyId: number, targetUserId: number, newPassword: string): Promise<void> {
+  const pool = await getPool();
+
+  const existing = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("user_id", sql.Int, targetUserId)
+    .query<{ username: string; is_active: boolean }>(`
+      SELECT username, is_active
+      FROM sec.users
+      WHERE company_id = @company_id AND user_id = @user_id;
+    `);
+
+  if (!existing.recordset[0]) {
+    throw new HttpError(404, "Usuario no encontrado");
+  }
+
+  if (!existing.recordset[0].is_active) {
+    throw new HttpError(400, "No se puede resetear la contrasena de un usuario inactivo");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+
+  await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("user_id", sql.Int, targetUserId)
+    .input("password_hash", sql.NVarChar(255), passwordHash)
+    .query(`
+      UPDATE sec.users
+      SET password_hash = @password_hash,
+          updated_at = SYSUTCDATETIME()
+      WHERE company_id = @company_id AND user_id = @user_id;
+    `);
+}

@@ -7,6 +7,7 @@ import {
   updateUserRolesSchema,
   createPermissionSchema,
   updatePermissionSchema,
+  resetPasswordSchema,
 } from "./admin.schemas";
 import {
   createRole,
@@ -24,6 +25,7 @@ import {
   createPermission,
   updatePermission,
   deletePermission,
+  resetUserPassword,
 } from "./admin.service";
 
 export async function getAdminPermissions(_req: Request, res: Response): Promise<void> {
@@ -119,4 +121,11 @@ export async function deleteAdminPermission(req: Request, res: Response): Promis
   const permissionId = Number(req.params.permissionId);
   await deletePermission(permissionId);
   res.json({ ok: true, message: "Permiso eliminado correctamente" });
+}
+
+export async function putAdminResetPassword(req: Request, res: Response): Promise<void> {
+  const targetUserId = Number(req.params.userId);
+  const parsed = resetPasswordSchema.parse(req.body ?? {});
+  await resetUserPassword(req.auth!.companyId, targetUserId, parsed.password);
+  res.json({ ok: true, message: "Contrasena actualizada correctamente" });
 }

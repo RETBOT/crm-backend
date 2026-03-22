@@ -7,6 +7,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Endpoint `PUT /admin/users/:userId/password` para resetear contrasena desde admin UI
+- `resetPasswordSchema` para validacion de nueva contrasena (min 6, max 100)
+- `resetUserPassword()` en admin service: bcrypt hash + UPDATE en BD
 - Sistema de notificaciones con tabla `crm.notifications`
 - `GET /api/notifications` - listar notificaciones del usuario (con generacion on-demand de due_soon y overdue)
 - `GET /api/notifications/badge` - contador de no leidas

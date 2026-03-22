@@ -41,6 +41,10 @@ export const updatePermissionSchema = z.object({
   permission_description: z.string().min(1).max(200).optional(),
 });
 
+export const resetPasswordSchema = z.object({
+  password: z.string().min(6, "Minimo 6 caracteres").max(100),
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserRolesInput = z.infer<typeof updateUserRolesSchema>;
 export type CreateRoleInput = z.infer<typeof createRoleSchema>;
@@ -48,3 +52,4 @@ export type UpdateRolePermissionsInput = z.infer<typeof updateRolePermissionsSch
 export type UpsertUserScopeInput = z.infer<typeof upsertUserScopeSchema>;
 export type CreatePermissionInput = z.infer<typeof createPermissionSchema>;
 export type UpdatePermissionInput = z.infer<typeof updatePermissionSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
