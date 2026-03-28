@@ -13,6 +13,8 @@ import { catalogRoutes } from "./modules/catalog/catalog.routes";
 import { customersRoutes } from "./modules/customers/customers.routes";
 import { dashboardRoutes } from "./modules/dashboard/dashboard.routes";
 import { activitiesRoutes } from "./modules/activities/activities.routes";
+import { opportunitiesRoutes } from "./modules/opportunities/opportunities.routes";
+import { productsRoutes } from "./modules/products/products.routes";
 import { notificationsRoutes } from "./modules/notifications/notifications.routes";
 import { errorHandler } from "./middlewares/error-handler";
 import { notFoundHandler } from "./middlewares/not-found";
@@ -46,6 +48,8 @@ export function createApp() {
   app.use("/api/cn", requireAuth, catalogRoutes);
   app.use("/api/cn", requireAuth, customersRoutes);
   app.use("/api/cn", requireAuth, activitiesRoutes);
+  app.use("/api/cn", requireAuth, opportunitiesRoutes);
+  app.use("/api/cn", requireAuth, productsRoutes);
   app.use("/api", requireAuth, notificationsRoutes);
   app.use("/api/dashboard", requireAuth, dashboardRoutes);
   app.use("/api/admin", requireAuth, adminRoutes);
