@@ -312,7 +312,7 @@ export async function advanceOpportunityStage(companyId: number, userId: number,
     .input("company_id", sql.Int, companyId)
     .input("stage_id", sql.Int, input.STAGE_ID)
     .query<{ stage_id: number; probability: number; is_closed: boolean; is_won: boolean }>(`
-      SELECT stage_id, default_probability AS probability, is_closed, is_won
+      SELECT stage_id, default_probability_pct AS probability, is_closed, is_won
       FROM crm.pipeline_stages WHERE company_id = @company_id AND stage_id = @stage_id;
     `);
 
@@ -391,8 +391,8 @@ export async function reopenOpportunity(companyId: number, userId: number, input
     .request()
     .input("company_id", sql.Int, companyId)
     .input("pipeline_id", sql.Int, existing.recordset[0].pipeline_id)
-    .query<{ stage_id: number; default_probability: number }>(`
-      SELECT TOP 1 stage_id, default_probability FROM crm.pipeline_stages
+    .query<{ stage_id: number; default_probability_pct: number }>(`
+      SELECT TOP 1 stage_id, default_probability_pct FROM crm.pipeline_stages
       WHERE company_id = @company_id AND pipeline_id = @pipeline_id AND is_closed = 0
       ORDER BY stage_order ASC;
     `);
@@ -402,7 +402,7 @@ export async function reopenOpportunity(companyId: number, userId: number, input
     .input("company_id", sql.Int, companyId)
     .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
     .input("stage_id", sql.Int, firstStage.recordset[0]?.stage_id)
-    .input("probability", sql.Decimal(5, 2), firstStage.recordset[0]?.default_probability || 10)
+    .input("probability", sql.Decimal(5, 2), firstStage.recordset[0]?.default_probability_pct || 10)
     .query(`
       UPDATE crm.opportunities SET
         status = 'abierta', stage_id = @stage_id, lost_reason = NULL,
@@ -418,7 +418,7 @@ export async function getPipelines(companyId: number) {
     .input("company_id", sql.Int, companyId)
     .query(`
       SELECT ps.stage_id AS ID, ps.stage_name AS NAME, ps.stage_order AS STAGE_ORDER,
-             ps.default_probability AS PROBABILITY, ps.is_closed AS IS_CLOSED, ps.is_won AS IS_WON,
+             ps.default_probability_pct AS PROBABILITY, ps.is_closed AS IS_CLOSED, ps.is_won AS IS_WON,
              ps.pipeline_id AS PIPELINE_ID, sp.pipeline_name AS PIPELINE_NAME
       FROM crm.pipeline_stages ps
       INNER JOIN crm.sales_pipelines sp ON sp.company_id = ps.company_id AND sp.pipeline_id = ps.pipeline_id
