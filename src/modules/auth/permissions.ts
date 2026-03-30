@@ -24,4 +24,8 @@ export const PERMISSIONS = {
   OPPORTUNITIES_ITEMS_CREATE: "opportunities.items.create",
   OPPORTUNITIES_ITEMS_UPDATE: "opportunities.items.update",
   OPPORTUNITIES_ITEMS_DELETE: "opportunities.items.delete",
+  REPORTS_VIEW: "reports.view",
+  REPORTS_EXPORT: "reports.export",
+  REPORTS_SCHEDULED: "reports.scheduled",
+  REPORTS_SAVED_VIEWS: "reports.saved_views",
 } as const;

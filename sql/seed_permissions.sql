@@ -109,6 +109,23 @@ INSERT INTO sec.permissions (permission_key, permission_description)
 SELECT 'opportunities.items.delete', N'Eliminar ítems de oportunidades'
 WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'opportunities.items.delete');
 
+-- Permisos de reportes
+INSERT INTO sec.permissions (permission_key, permission_description)
+SELECT 'reports.view', N'Ver reportes'
+WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'reports.view');
+
+INSERT INTO sec.permissions (permission_key, permission_description)
+SELECT 'reports.export', N'Exportar reportes'
+WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'reports.export');
+
+INSERT INTO sec.permissions (permission_key, permission_description)
+SELECT 'reports.scheduled', N'Programar reportes automáticos'
+WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'reports.scheduled');
+
+INSERT INTO sec.permissions (permission_key, permission_description)
+SELECT 'reports.saved_views', N'Guardar vistas de reportes'
+WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'reports.saved_views');
+
 INSERT INTO sec.roles (company_id, role_name, role_description, is_active)
 SELECT @company_id, 'admin', N'Administrador general', 1
 WHERE NOT EXISTS (
@@ -147,7 +164,8 @@ WHERE p.permission_key IN (
   'activities.create', 'activities.update', 'activities.complete', 'activities.assign',
   'products.create', 'products.update', 'products.delete', 'products.price.edit',
   'opportunities.create', 'opportunities.update', 'opportunities.delete',
-  'opportunities.price.edit', 'opportunities.items.create', 'opportunities.items.update', 'opportunities.items.delete'
+  'opportunities.price.edit', 'opportunities.items.create', 'opportunities.items.update', 'opportunities.items.delete',
+  'reports.view', 'reports.export', 'reports.scheduled', 'reports.saved_views'
 )
 AND NOT EXISTS (
   SELECT 1 FROM sec.role_permissions rp WHERE rp.role_id = @role_admin AND rp.permission_id = p.permission_id
@@ -160,7 +178,8 @@ WHERE p.permission_key IN (
   'customers.create', 'customers.update', 'prospects.create', 'prospects.update',
   'products.create', 'products.update', 'products.price.edit',
   'opportunities.create', 'opportunities.update', 'opportunities.delete',
-  'opportunities.price.edit', 'opportunities.items.create', 'opportunities.items.update', 'opportunities.items.delete'
+  'opportunities.price.edit', 'opportunities.items.create', 'opportunities.items.update', 'opportunities.items.delete',
+  'reports.view'
 )
 AND NOT EXISTS (
   SELECT 1 FROM sec.role_permissions rp WHERE rp.role_id = @role_ventas AND rp.permission_id = p.permission_id
@@ -174,7 +193,8 @@ WHERE p.permission_key IN (
   'prospects.create', 'prospects.update', 'prospects.convert',
   'products.create', 'products.update', 'products.delete', 'products.price.edit',
   'opportunities.create', 'opportunities.update', 'opportunities.delete',
-  'opportunities.price.edit', 'opportunities.items.create', 'opportunities.items.update', 'opportunities.items.delete'
+  'opportunities.price.edit', 'opportunities.items.create', 'opportunities.items.update', 'opportunities.items.delete',
+  'reports.view', 'reports.export', 'reports.saved_views'
 )
 AND NOT EXISTS (
   SELECT 1 FROM sec.role_permissions rp WHERE rp.role_id = @role_supervisor AND rp.permission_id = p.permission_id

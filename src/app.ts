@@ -16,6 +16,7 @@ import { activitiesRoutes } from "./modules/activities/activities.routes";
 import { opportunitiesRoutes } from "./modules/opportunities/opportunities.routes";
 import { productsRoutes } from "./modules/products/products.routes";
 import { notificationsRoutes } from "./modules/notifications/notifications.routes";
+import { reportsRoutes } from "./modules/reports/reports.routes";
 import { errorHandler } from "./middlewares/error-handler";
 import { notFoundHandler } from "./middlewares/not-found";
 
@@ -53,6 +54,7 @@ export function createApp() {
   app.use("/api", requireAuth, notificationsRoutes);
   app.use("/api/dashboard", requireAuth, dashboardRoutes);
   app.use("/api/admin", requireAuth, adminRoutes);
+  app.use("/api/reports", requireAuth, reportsRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
