@@ -46,6 +46,10 @@ async function run() {
     ["opportunities.items.create", "Crear ítems de oportunidades"],
     ["opportunities.items.update", "Actualizar ítems de oportunidades"],
     ["opportunities.items.delete", "Eliminar ítems de oportunidades"],
+    ["reports.view", "Ver reportes"],
+    ["reports.export", "Exportar reportes"],
+    ["reports.scheduled", "Programar reportes automáticos"],
+    ["reports.saved_views", "Guardar vistas de reportes"],
   ];
 
   for (const [key, desc] of permissions) {
@@ -132,6 +136,7 @@ async function run() {
     "opportunities.items.create",
     "opportunities.items.update",
     "opportunities.items.delete",
+    "reports.view",
   ]);
   await assignRolePermissions("supervisor", [
     "customers.create",
@@ -150,6 +155,9 @@ async function run() {
     "opportunities.items.create",
     "opportunities.items.update",
     "opportunities.items.delete",
+    "reports.view",
+    "reports.export",
+    "reports.saved_views",
   ]);
 
   const adminUser = await pool
