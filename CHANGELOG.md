@@ -21,6 +21,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - Endpoint `GET /cn/actividades_usuarios` para listar usuarios de la sucursal
 - `OWNER_USER_ID` opcional en `activityCreateSchema`
 - `getUsersForAssignment()` en service: filtra usuarios activos por scope del creador
+- Permisos de productos: `products.create`, `products.update`, `products.delete`, `products.price.edit`
+- Permisos de oportunidades: `opportunities.create`, `opportunities.update`, `opportunities.delete`, `opportunities.price.edit`
+- Permisos de items de oportunidades: `opportunities.items.create`, `opportunities.items.update`, `opportunities.items.delete`
+- Modulo completo de productos con CRUD y permisos
+- Modulo completo de oportunidades con CRUD y permisos
 
 ### Changed
 - `createActivity` acepta parametro `canAssign` y `OWNER_USER_ID` opcional

@@ -35,6 +35,17 @@ async function run() {
     ["activities.update", "Actualizar actividades"],
     ["activities.complete", "Completar/cancelar actividades"],
     ["activities.assign", "Asignar actividades a otros usuarios"],
+    ["products.create", "Crear productos"],
+    ["products.update", "Actualizar productos"],
+    ["products.delete", "Eliminar productos"],
+    ["products.price.edit", "Editar precios de productos"],
+    ["opportunities.create", "Crear oportunidades"],
+    ["opportunities.update", "Actualizar oportunidades"],
+    ["opportunities.delete", "Eliminar oportunidades"],
+    ["opportunities.price.edit", "Editar precios de oportunidades"],
+    ["opportunities.items.create", "Crear ítems de oportunidades"],
+    ["opportunities.items.update", "Actualizar ítems de oportunidades"],
+    ["opportunities.items.delete", "Eliminar ítems de oportunidades"],
   ];
 
   for (const [key, desc] of permissions) {
@@ -111,6 +122,16 @@ async function run() {
     "customers.update",
     "prospects.create",
     "prospects.update",
+    "products.create",
+    "products.update",
+    "products.price.edit",
+    "opportunities.create",
+    "opportunities.update",
+    "opportunities.delete",
+    "opportunities.price.edit",
+    "opportunities.items.create",
+    "opportunities.items.update",
+    "opportunities.items.delete",
   ]);
   await assignRolePermissions("supervisor", [
     "customers.create",
@@ -118,6 +139,17 @@ async function run() {
     "prospects.create",
     "prospects.update",
     "prospects.convert",
+    "products.create",
+    "products.update",
+    "products.delete",
+    "products.price.edit",
+    "opportunities.create",
+    "opportunities.update",
+    "opportunities.delete",
+    "opportunities.price.edit",
+    "opportunities.items.create",
+    "opportunities.items.update",
+    "opportunities.items.delete",
   ]);
 
   const adminUser = await pool

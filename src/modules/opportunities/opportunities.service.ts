@@ -428,10 +428,103 @@ export async function getPipelines(companyId: number) {
   return result.recordset;
 }
 
+async function getProductPrice(companyId: number, productId: number): Promise<number> {
+  const pool = await getPool();
+  const result = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("product_id", sql.Int, productId)
+    .query(`
+      SELECT unit_price 
+      FROM crm.products 
+      WHERE company_id = @company_id AND product_id = @product_id AND is_active = 1
+    `);
+  
+  if (!result.recordset[0]) {
+    throw new HttpError(404, "Producto no encontrado o inactivo");
+  }
+  
+  return result.recordset[0].unit_price;
+}
+
+export async function createOpportunityItem(companyId: number, opportunityId: number, input: OpportunityItemInput) {
+  const pool = await getPool();
+  
+  // Si se proporcionó un product_id, obtener el precio real desde BD
+  let unitPrice = input.UNIT_PRICE || 0;
+  if (input.PRODUCT_ID) {
+    unitPrice = await getProductPrice(companyId, input.PRODUCT_ID);
+  }
+  
+  const result = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("opportunity_id", sql.Int, opportunityId)
+    .input("product_id", sql.Int, input.PRODUCT_ID ?? null)
+    .input("item_description", sql.NVarChar(200), input.ITEM_DESCRIPTION || "")
+    .input("quantity", sql.Decimal(12, 2), input.QUANTITY || 1)
+    .input("unit_price", sql.Decimal(18, 2), unitPrice)
+    .input("discount_pct", sql.Decimal(5, 2), input.DISCOUNT_PCT || 0)
+    .query(`
+      INSERT INTO crm.opportunity_items (company_id, opportunity_id, product_id, item_description, quantity, unit_price, discount_pct)
+      OUTPUT INSERTED.opportunity_item_id
+      VALUES (@company_id, @opportunity_id, @product_id, @item_description, @quantity, @unit_price, @discount_pct);
+    `);
+  
+  return result.recordset[0].opportunity_item_id;
+}
+
+export async function updateOpportunityItem(companyId: number, opportunityId: number, itemId: number, input: OpportunityItemInput) {
+  const pool = await getPool();
+  
+  // Siempre obtener el precio real desde BD (nunca permitir edición directa de precio)
+  let unitPrice = 0;
+  if (input.PRODUCT_ID) {
+    unitPrice = await getProductPrice(companyId, input.PRODUCT_ID);
+  }
+  
+  await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("opportunity_id", sql.Int, opportunityId)
+    .input("opportunity_item_id", sql.Int, itemId)
+    .input("product_id", sql.Int, input.PRODUCT_ID ?? null)
+    .input("item_description", sql.NVarChar(200), input.ITEM_DESCRIPTION || "")
+    .input("quantity", sql.Decimal(12, 2), input.QUANTITY || 1)
+    .input("unit_price", sql.Decimal(18, 2), unitPrice)
+    .input("discount_pct", sql.Decimal(5, 2), input.DISCOUNT_PCT || 0)
+    .query(`
+      UPDATE crm.opportunity_items 
+      SET product_id = @product_id,
+          item_description = @item_description,
+          quantity = @quantity,
+          unit_price = @unit_price,
+          discount_pct = @discount_pct
+      WHERE company_id = @company_id 
+        AND opportunity_id = @opportunity_id 
+        AND opportunity_item_id = @opportunity_item_id;
+    `);
+}
+
+export async function deleteOpportunityItem(companyId: number, opportunityId: number, itemId: number) {
+  const pool = await getPool();
+  
+  await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("opportunity_id", sql.Int, opportunityId)
+    .input("opportunity_item_id", sql.Int, itemId)
+    .query(`
+      DELETE FROM crm.opportunity_items 
+      WHERE company_id = @company_id 
+        AND opportunity_id = @opportunity_id 
+        AND opportunity_item_id = @opportunity_item_id;
+    `);
+}
+
 export async function getOpportunitiesByCustomer(companyId: number, userId: number, customerId: number) {
   await assertCustomerInScope(companyId, userId, customerId);
   const pool = await getPool();
-
   const result = await pool
     .request()
     .input("company_id", sql.Int, companyId)

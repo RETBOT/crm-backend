@@ -6,9 +6,12 @@ import {
   getPipelinesHandler,
   postAdvanceStage,
   postCreateOpportunity,
+  postCreateOpportunityItem,
+  postDeleteOpportunityItem,
   postReopen,
   postSetStatus,
   postUpdateOpportunity,
+  postUpdateOpportunityItem,
 } from "./opportunities.controller";
 
 const router = Router();
@@ -20,6 +23,9 @@ router.post("/oportunidades_avanzar", postAdvanceStage);
 router.post("/oportunidades_status", postSetStatus);
 router.post("/oportunidades_reabrir", postReopen);
 router.get("/oportunidades/:id/items", getOpportunityItemsHandler);
+router.post("/oportunidades/:id/items", postCreateOpportunityItem);
+router.put("/oportunidades/:opportunityId/items/:itemId", postUpdateOpportunityItem);
+router.delete("/oportunidades/:opportunityId/items/:itemId", postDeleteOpportunityItem);
 router.get("/oportunidades_by_customer/:customerId", getOpportunitiesByCustomerHandler);
 router.get("/pipelines", getPipelinesHandler);
 
