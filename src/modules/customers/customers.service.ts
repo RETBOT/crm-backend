@@ -41,14 +41,16 @@ async function assertCustomerInScope(
   const pool = await getPool();
   const resolvedScope = scope ?? (await resolveUserScope(companyId, userId));
 
-  const numericId = Number(clientId);
-  const isNumeric = !isNaN(numericId) && clientId.trim() !== "";
+  const clientCode = clientId && clientId.trim() ? clientId.trim() : null;
+
+  if (!clientCode) {
+    throw new HttpError(400, "CLIENTEID es requerido");
+  }
 
   const result = await pool
     .request()
     .input("company_id", sql.Int, companyId)
-    .input("client_id", sql.Int, isNumeric ? numericId : null)
-    .input("client_code", sql.VarChar(30), isNumeric ? null : clientId)
+    .input("client_code", sql.VarChar(30), clientCode)
     .input("scope_type", sql.VarChar(10), resolvedScope.scopeType)
     .input("branch_ids_csv", sql.VarChar(sql.MAX), resolvedScope.branchIdsCsv)
     .input("route_ids_csv", sql.VarChar(sql.MAX), resolvedScope.routeIdsCsv)
@@ -56,10 +58,7 @@ async function assertCustomerInScope(
       SELECT c.customer_id
       FROM crm.customers c
       WHERE c.company_id = @company_id
-        AND (
-          (@client_id IS NOT NULL AND c.customer_id = @client_id)
-          OR (@client_code IS NOT NULL AND c.customer_code = @client_code)
-        )
+        AND c.customer_code = @client_code
         AND ${buildScopeConditionSql("c")};
     `);
 
@@ -163,8 +162,20 @@ export async function listContacts(companyId: number, userId: number, input: Con
   const pool = await getPool();
   const scope = await resolveUserScope(companyId, userId);
 
-  const hasCustomer = input.CLIENTEID && input.CLIENTEID !== "" && input.CLIENTEID !== "0";
-  const whereCustomer = hasCustomer ? "AND v.customer_id = @customer_id" : "";
+  let resolvedCustomerId: number | null = null;
+  if (input.CLIENTEID && input.CLIENTEID !== "" && input.CLIENTEID !== "0") {
+    const lookup = await pool
+      .request()
+      .input("company_id", sql.Int, companyId)
+      .input("customer_code", sql.VarChar(30), input.CLIENTEID)
+      .query<{ customer_id: number }>(`
+        SELECT customer_id FROM crm.customers
+        WHERE company_id = @company_id AND customer_code = @customer_code;
+      `);
+    resolvedCustomerId = lookup.recordset[0]?.customer_id ?? null;
+  }
+
+  const whereCustomer = resolvedCustomerId ? "AND v.customer_id = @customer_id" : "";
 
   const result = await pool
     .request()
@@ -172,7 +183,7 @@ export async function listContacts(companyId: number, userId: number, input: Con
     .input("scope_type", sql.VarChar(10), scope.scopeType)
     .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
     .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
-    .input("customer_id", sql.Int, hasCustomer ? Number(input.CLIENTEID) : null)
+    .input("customer_id", sql.Int, resolvedCustomerId)
     .query(`
       SELECT v.ID, c.customer_id, v.CLIENTEID, c.customer_name AS NOMBRECLI, v.NOMBRE, v.APATERNO, v.AMATERNO,
              v.TELEFONO, v.EXTENSION, v.PUESTOID, v.PUESTO, v.COMENTARIOS, v.WHATSAPP, v.EMAIL
@@ -230,10 +241,11 @@ export async function contactsAbc(companyId: number, userId: number, input: Cont
   }
 
   if (input.TIPO === "C") {
-    await pool
+    const result = await pool
       .request()
       .input("company_id", sql.Int, companyId)
       .input("contact_id", sql.Int, input.CONTACTOID)
+      .input("customer_id", sql.Int, customerId)
       .input("first_name", sql.NVarChar(100), input.NOMBRE || "")
       .input("last_name", sql.NVarChar(100), input.APATERNO || "")
       .input("second_last_name", sql.NVarChar(100), input.AMATERNO || "")
@@ -256,22 +268,34 @@ export async function contactsAbc(companyId: number, userId: number, input: Cont
                email = @email,
                updated_at = SYSUTCDATETIME()
          WHERE company_id = @company_id
-           AND contact_id = @contact_id;
+           AND contact_id = @contact_id
+           AND customer_id = @customer_id;
       `);
+
+    if (!result.rowsAffected[0]) {
+      throw new HttpError(404, "Contacto no encontrado o no pertenece al cliente indicado");
+    }
+
     return "Contacto actualizado correctamente";
   }
 
-  await pool
+  const result = await pool
     .request()
     .input("company_id", sql.Int, companyId)
     .input("contact_id", sql.Int, input.CONTACTOID)
+    .input("customer_id", sql.Int, customerId)
     .query(`
       UPDATE crm.contacts
          SET is_active = 0,
              updated_at = SYSUTCDATETIME()
        WHERE company_id = @company_id
-         AND contact_id = @contact_id;
+         AND contact_id = @contact_id
+         AND customer_id = @customer_id;
     `);
+
+  if (!result.rowsAffected[0]) {
+    throw new HttpError(404, "Contacto no encontrado o no pertenece al cliente indicado");
+  }
 
   return "Contacto eliminado correctamente";
 }
@@ -280,7 +304,7 @@ async function getNextCustomerCode(companyId: number): Promise<string> {
   const pool = await getPool();
   const result = await pool.request().input("company_id", sql.Int, companyId).query<{ next_code: number }>(`
     SELECT ISNULL(MAX(TRY_CONVERT(INT, customer_code)), 100000) + 1 AS next_code
-    FROM crm.customers
+    FROM crm.customers WITH (UPDLOCK, HOLDLOCK)
     WHERE company_id = @company_id;
   `);
 
@@ -317,7 +341,7 @@ export async function customersAbc(companyId: number, userId: number, input: Cus
       .input("customer_name", sql.NVarChar(180), input.NOMBRECLI)
       .input("customer_type", sql.VarChar(15), input.TIPO_CLIENTE)
       .input("business_line", sql.NVarChar(120), input.GIRO || null)
-      .input("status", sql.VarChar(10), input.ESTATUS || "ACTIVO")
+      .input("status", sql.VarChar(10), "ACTIVO")
       .input("branch_id", sql.Int, branchId)
       .input("route_id", sql.Int, routeId)
       .input("street", sql.NVarChar(120), input.CALLE || null)
@@ -329,16 +353,17 @@ export async function customersAbc(companyId: number, userId: number, input: Cus
       .input("phone", sql.VarChar(30), input.TEL || null)
       .input("latitude", sql.Decimal(9, 6), input.LAT ?? null)
       .input("longitude", sql.Decimal(9, 6), input.LON ?? null)
+      .input("created_by_user_id", sql.Int, userId)
       .query(`
         INSERT INTO crm.customers (
           company_id, customer_code, customer_name, customer_type, business_line, status,
           branch_id, route_id, street, ext_number, neighborhood, city, state,
-          email, phone, latitude, longitude, created_at, updated_at
+          email, phone, latitude, longitude, created_at, updated_at, created_by_user_id
         )
         VALUES (
           @company_id, @customer_code, @customer_name, @customer_type, @business_line, @status,
           @branch_id, @route_id, @street, @ext_number, @neighborhood, @city, @state,
-          @email, @phone, @latitude, @longitude, SYSUTCDATETIME(), SYSUTCDATETIME()
+          @email, @phone, @latitude, @longitude, SYSUTCDATETIME(), SYSUTCDATETIME(), @created_by_user_id
         );
       `);
 
@@ -352,12 +377,27 @@ export async function customersAbc(companyId: number, userId: number, input: Cus
   await assertCustomerInScope(companyId, userId, input.CLIENTEID, scope);
 
   if (input.TIPO === "C") {
-    await pool
+    const existingResult = await pool
+      .request()
+      .input("company_id", sql.Int, companyId)
+      .input("customer_code", sql.VarChar(30), input.CLIENTEID)
+      .query<{ customer_type: string }>(`
+        SELECT customer_type FROM crm.customers
+        WHERE company_id = @company_id AND customer_code = @customer_code;
+      `);
+
+    if (!existingResult.recordset[0]) {
+      throw new HttpError(404, "Cliente no encontrado");
+    }
+
+    const effectiveCustomerType = existingResult.recordset[0].customer_type;
+
+    const result = await pool
       .request()
       .input("company_id", sql.Int, companyId)
       .input("customer_code", sql.VarChar(30), input.CLIENTEID)
       .input("customer_name", sql.NVarChar(180), input.NOMBRECLI)
-      .input("customer_type", sql.VarChar(15), input.TIPO_CLIENTE)
+      .input("customer_type", sql.VarChar(15), effectiveCustomerType)
       .input("business_line", sql.NVarChar(120), input.GIRO || null)
       .input("status", sql.VarChar(10), input.ESTATUS || "ACTIVO")
       .input("branch_id", sql.Int, branchId)
@@ -371,6 +411,7 @@ export async function customersAbc(companyId: number, userId: number, input: Cus
       .input("phone", sql.VarChar(30), input.TEL || null)
       .input("latitude", sql.Decimal(9, 6), input.LAT ?? null)
       .input("longitude", sql.Decimal(9, 6), input.LON ?? null)
+      .input("updated_by_user_id", sql.Int, userId)
       .query(`
         UPDATE crm.customers
            SET customer_name = @customer_name,
@@ -388,15 +429,20 @@ export async function customersAbc(companyId: number, userId: number, input: Cus
                phone = @phone,
                latitude = @latitude,
                longitude = @longitude,
+               updated_by_user_id = @updated_by_user_id,
                updated_at = SYSUTCDATETIME()
          WHERE company_id = @company_id
            AND customer_code = @customer_code;
       `);
 
+    if (!result.rowsAffected[0]) {
+      throw new HttpError(404, "No se pudo actualizar el cliente");
+    }
+
     return "Registro actualizado correctamente";
   }
 
-  await pool
+  const result = await pool
     .request()
     .input("company_id", sql.Int, companyId)
     .input("customer_code", sql.VarChar(30), input.CLIENTEID)
@@ -407,6 +453,10 @@ export async function customersAbc(companyId: number, userId: number, input: Cus
        WHERE company_id = @company_id
          AND customer_code = @customer_code;
     `);
+
+  if (!result.rowsAffected[0]) {
+    throw new HttpError(404, "Cliente no encontrado");
+  }
 
   return "Registro inactivado correctamente";
 }
@@ -433,7 +483,7 @@ export async function convertProspectToCustomer(companyId: number, userId: numbe
   }
 
   if (current.recordset[0].customer_type === "CLIENTE") {
-    return "El registro ya es cliente";
+    throw new HttpError(400, "El registro ya es un cliente, no se requiere conversión");
   }
 
   await pool

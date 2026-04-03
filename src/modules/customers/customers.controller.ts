@@ -22,18 +22,37 @@ function hasPermission(req: Request, permission: string): boolean {
 
 export async function getCustomers(req: Request, res: Response): Promise<void> {
   const input = customersSchema.parse(req.body ?? {});
+
+  const type = (input.TIPO || "CLIENTE").toUpperCase();
+  const requiredPermission = type === "PROSPECTO" ? PERMISSIONS.PROSPECTS_READ : PERMISSIONS.CUSTOMERS_READ;
+  if (!hasPermission(req, requiredPermission)) {
+    res.status(403).json(abcError("No cuenta con permisos para ver los clientes"));
+    return;
+  }
+
   const data = await listCustomers(req.auth!.companyId, req.auth!.userId, input);
   res.json(data);
 }
 
 export async function getContacts(req: Request, res: Response): Promise<void> {
   const input = contactsSchema.parse(req.body ?? {});
+
+  if (!hasPermission(req, PERMISSIONS.CUSTOMERS_READ)) {
+    res.status(403).json(abcError("No cuenta con permisos para ver los contactos"));
+    return;
+  }
+
   const data = await listContacts(req.auth!.companyId, req.auth!.userId, input);
   res.json(data);
 }
 
 export async function postContactsAbc(req: Request, res: Response): Promise<void> {
   const input = contactsAbcSchema.parse(req.body ?? {});
+
+  if (!hasPermission(req, PERMISSIONS.CUSTOMERS_UPDATE)) {
+    res.status(403).json(abcError("No cuenta con permisos para gestionar contactos"));
+    return;
+  }
 
   try {
     const msg = await contactsAbc(req.auth!.companyId, req.auth!.userId, input);
@@ -48,21 +67,21 @@ export async function postCustomersAbc(req: Request, res: Response): Promise<voi
   const input = customersAbcSchema.parse(req.body ?? {});
 
   try {
-    const type = input.TIPO_CLIENTE === "PROSPECTO" ? "PROSPECTO" : "CLIENTE";
-    const permissionMap =
-      type === "PROSPECTO"
-        ? {
-            A: PERMISSIONS.PROSPECTS_CREATE,
-            C: PERMISSIONS.PROSPECTS_UPDATE,
-            B: PERMISSIONS.PROSPECTS_DELETE,
-          }
-        : {
-            A: PERMISSIONS.CUSTOMERS_CREATE,
-            C: PERMISSIONS.CUSTOMERS_UPDATE,
-            B: PERMISSIONS.CUSTOMERS_DELETE,
-          };
+    let requiredPermission: string;
 
-    const requiredPermission = permissionMap[input.TIPO];
+    if (input.TIPO === "A") {
+      requiredPermission = input.TIPO_CLIENTE === "PROSPECTO"
+        ? PERMISSIONS.PROSPECTS_CREATE
+        : PERMISSIONS.CUSTOMERS_CREATE;
+    } else {
+      const actualType = await getActualCustomerType(req.auth!.companyId, input.CLIENTEID);
+      if (actualType === "PROSPECTO") {
+        requiredPermission = input.TIPO === "C" ? PERMISSIONS.PROSPECTS_UPDATE : PERMISSIONS.PROSPECTS_DELETE;
+      } else {
+        requiredPermission = input.TIPO === "C" ? PERMISSIONS.CUSTOMERS_UPDATE : PERMISSIONS.CUSTOMERS_DELETE;
+      }
+    }
+
     if (!hasPermission(req, requiredPermission)) {
       res.status(403).json(abcError("No cuenta con permisos para esta acción"));
       return;
@@ -74,6 +93,20 @@ export async function postCustomersAbc(req: Request, res: Response): Promise<voi
     const msg = error instanceof Error ? error.message : "No se pudo completar la operación";
     res.status(400).json(abcError(msg));
   }
+}
+
+async function getActualCustomerType(companyId: number, customerCode: string): Promise<string | null> {
+  if (!customerCode || !customerCode.trim()) return null;
+  const { getPool, sql } = await import("../../db/sqlserver");
+  const pool = await getPool();
+  const result = await pool.request()
+    .input("company_id", sql.Int, companyId)
+    .input("customer_code", sql.VarChar(30), customerCode)
+    .query<{ customer_type: string }>(`
+      SELECT customer_type FROM crm.customers
+      WHERE company_id = @company_id AND customer_code = @customer_code;
+    `);
+  return result.recordset[0]?.customer_type ?? null;
 }
 
 export async function postConvertProspect(req: Request, res: Response): Promise<void> {

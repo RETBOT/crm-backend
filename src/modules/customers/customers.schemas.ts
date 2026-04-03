@@ -6,8 +6,8 @@ export const customersSchema = z.object({
   SUCURSAL: z.union([z.string(), z.number()]).optional().transform((v) => String(v ?? "")),
   ESTATUS: z.string().optional().default(""),
   RUTA: z.union([z.string(), z.number()]).optional().transform((v) => String(v ?? "")),
-  NPAG: z.coerce.number().optional().default(1),
-  TPAG: z.coerce.number().optional().default(20),
+  NPAG: z.coerce.number().optional().default(1).refine((v) => !isNaN(v) && v > 0, { message: "NPAG debe ser un número positivo" }),
+  TPAG: z.coerce.number().optional().default(20).refine((v) => !isNaN(v) && v >= 0, { message: "TPAG debe ser un número válido" }),
   TIPO: z.string().optional().default("CLIENTE"),
 });
 
@@ -26,7 +26,7 @@ export const contactsAbcSchema = z.object({
   PUESTOID: z.string().optional().default(""),
   COMENTARIOS: z.string().optional().default(""),
   WHATSAPP: z.string().optional().default(""),
-  EMAIL: z.string().optional().default(""),
+  EMAIL: z.string().optional().default("").refine((v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), { message: "Email inválido" }),
   TIPO: z.enum(["A", "C", "B"]),
 });
 
@@ -40,7 +40,7 @@ export const customersAbcSchema = z
   COLONIA: z.string().optional().default(""),
   CIUDAD: z.string().optional().default(""),
   ESTADO: z.string().optional().default(""),
-  EMAIL: z.string().optional().default(""),
+  EMAIL: z.string().optional().default("").refine((v) => v === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), { message: "Email inválido" }),
   TEL: z.string().optional().default(""),
   ESTATUS: z.string().optional().default("ACTIVO"),
   SUCURSAL: z.coerce.number().optional().nullable(),
