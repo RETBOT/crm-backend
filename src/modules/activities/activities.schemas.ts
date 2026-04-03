@@ -38,9 +38,18 @@ export const activityUpdateSchema = z
 export const activityCompleteSchema = z.object({
   ACTIVITY_ID: z.coerce.number(),
   STATUS: z.enum(["Completada", "Cancelada"]),
+  CHECK_IN_LAT: z.number().min(-90).max(90).optional().nullable(),
+  CHECK_IN_LON: z.number().min(-180).max(180).optional().nullable(),
+});
+
+export const activityCheckinsListSchema = z.object({
+  FROM_DATE: z.string().optional().nullable(),
+  TO_DATE: z.string().optional().nullable(),
+  USER_ID: z.coerce.number().optional().nullable(),
 });
 
 export type ActivitiesListInput = z.infer<typeof activitiesListSchema>;
 export type ActivityCreateInput = z.infer<typeof activityCreateSchema>;
 export type ActivityUpdateInput = z.infer<typeof activityUpdateSchema>;
 export type ActivityCompleteInput = z.infer<typeof activityCompleteSchema>;
+export type ActivityCheckinsListInput = z.infer<typeof activityCheckinsListSchema>;

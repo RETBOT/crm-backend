@@ -6,10 +6,12 @@ import {
   activityCompleteSchema,
   activityCreateSchema,
   activityUpdateSchema,
+  activityCheckinsListSchema,
 } from "./activities.schemas";
 import {
   completeActivity,
   createActivity,
+  getActivityCheckins,
   getActivityTypes,
   getUsersForAssignment,
   listActivities,
@@ -83,12 +85,23 @@ export async function getActivityTypesHandler(_req: Request, res: Response): Pro
   res.json(data);
 }
 
-export async function getActivityUsersHandler(req: Request, res: Response): Promise<void> {
+export async function getActivityUsersHandler(_req: Request, res: Response): Promise<void> {
   try {
     const data = await getUsersForAssignment(req.auth!.companyId, req.auth!.userId);
     res.json(data);
   } catch (error) {
     const msg = error instanceof Error ? error.message : "No se pudieron obtener los usuarios";
+    res.status(400).json(abcError(msg));
+  }
+}
+
+export async function getActivityCheckinsHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const input = activityCheckinsListSchema.parse(req.body ?? {});
+    const data = await getActivityCheckins(req.auth!.companyId, req.auth!.userId, input);
+    res.json(data);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "No se pudieron obtener los check-ins";
     res.status(400).json(abcError(msg));
   }
 }

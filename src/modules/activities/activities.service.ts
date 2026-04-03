@@ -7,6 +7,7 @@ import {
   ActivityCompleteInput,
   ActivityCreateInput,
   ActivityUpdateInput,
+  ActivityCheckinsListInput,
 } from "./activities.schemas";
 
 function buildScopeConditionSql(alias: string): string {
@@ -318,16 +319,21 @@ export async function completeActivity(companyId: number, userId: number, input:
   await assertCustomerInScope(companyId, userId, existing.recordset[0].customer_id);
 
   const completedAt = input.STATUS === "Completada" ? "SYSUTCDATETIME()" : "NULL";
+  const hasCheckIn = input.STATUS === "Completada" && input.CHECK_IN_LAT != null && input.CHECK_IN_LON != null;
 
   await pool
     .request()
     .input("company_id", sql.Int, companyId)
     .input("activity_id", sql.Int, input.ACTIVITY_ID)
     .input("status", sql.VarChar(20), input.STATUS)
+    .input("check_in_lat", sql.Decimal(9, 6), hasCheckIn ? input.CHECK_IN_LAT : null)
+    .input("check_in_lon", sql.Decimal(9, 6), hasCheckIn ? input.CHECK_IN_LON : null)
     .query(`
       UPDATE crm.activities
          SET status = @status,
              completed_at = ${completedAt},
+             check_in_lat = @check_in_lat,
+             check_in_lon = @check_in_lon,
              updated_at = SYSUTCDATETIME()
        WHERE company_id = @company_id
          AND activity_id = @activity_id;
@@ -379,6 +385,58 @@ export async function getUsersForAssignment(companyId: number, userId: number) {
           )
         )
       ORDER BY u.display_name;
+    `);
+
+  return result.recordset;
+}
+
+export async function getActivityCheckins(companyId: number, userId: number, input: ActivityCheckinsListInput) {
+  const pool = await getPool();
+  const scope = await resolveUserScope(companyId, userId);
+
+  const whereFrom = input.FROM_DATE ? "AND a.completed_at >= @from_date" : "";
+  const whereTo = input.TO_DATE ? "AND a.completed_at <= @to_date" : "";
+  const whereUser = input.USER_ID ? "AND a.owner_user_id = @user_id" : "";
+
+  const scopeSql = buildScopeConditionSql("a");
+
+  const result = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("scope_type", sql.VarChar(10), scope.scopeType)
+    .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
+    .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
+    .input("from_date", sql.DateTime2, input.FROM_DATE ? new Date(input.FROM_DATE) : null)
+    .input("to_date", sql.DateTime2, input.TO_DATE ? new Date(input.TO_DATE) : null)
+    .input("user_id", sql.Int, input.USER_ID ?? null)
+    .query(`
+      SELECT
+        a.activity_id AS ACTIVITYID,
+        a.customer_id AS CUSTOMER_ID,
+        c.customer_name AS NOMBRECLI,
+        c.latitude AS CUSTOMER_LAT,
+        c.longitude AS CUSTOMER_LON,
+        a.activity_type_code AS TYPE,
+        aty.activity_type_name AS TYPE_NAME,
+        a.subject AS SUBJECT,
+        a.check_in_lat AS CHECK_IN_LAT,
+        a.check_in_lon AS CHECK_IN_LON,
+        a.completed_at AS COMPLETED_AT,
+        a.owner_user_id AS OWNER_ID,
+        u.display_name AS OWNER_NAME
+      FROM crm.activities a
+      INNER JOIN crm.customers c ON c.company_id = a.company_id AND c.customer_id = a.customer_id
+      INNER JOIN cat.activity_types aty ON aty.activity_type_code = a.activity_type_code
+      LEFT JOIN sec.users u ON u.company_id = a.company_id AND u.user_id = a.owner_user_id
+      WHERE a.company_id = @company_id
+        AND a.status = 'Completada'
+        AND a.check_in_lat IS NOT NULL
+        AND a.check_in_lon IS NOT NULL
+        AND ${scopeSql}
+        ${whereFrom}
+        ${whereTo}
+        ${whereUser}
+      ORDER BY a.completed_at DESC;
     `);
 
   return result.recordset;

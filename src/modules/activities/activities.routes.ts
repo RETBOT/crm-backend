@@ -3,6 +3,7 @@ import {
   getActivities,
   getActivityTypesHandler,
   getActivityUsersHandler,
+  getActivityCheckinsHandler,
   postCompleteActivity,
   postCreateActivity,
   postUpdateActivity,
@@ -16,5 +17,6 @@ router.post("/actividades_actualizar", postUpdateActivity);
 router.post("/actividades_completar", postCompleteActivity);
 router.get("/actividades_tipos", getActivityTypesHandler);
 router.get("/actividades_usuarios", getActivityUsersHandler);
+router.post("/actividades_checkins", getActivityCheckinsHandler);
 
 export { router as activitiesRoutes };
