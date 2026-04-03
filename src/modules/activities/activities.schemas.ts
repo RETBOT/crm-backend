@@ -40,12 +40,14 @@ export const activityCompleteSchema = z.object({
   STATUS: z.enum(["Completada", "Cancelada"]),
   CHECK_IN_LAT: z.number().min(-90).max(90).optional().nullable(),
   CHECK_IN_LON: z.number().min(-180).max(180).optional().nullable(),
+  NOTES: z.string().optional().nullable(),
 });
 
 export const activityCheckinsListSchema = z.object({
   FROM_DATE: z.string().optional().nullable(),
   TO_DATE: z.string().optional().nullable(),
   USER_ID: z.coerce.number().optional().nullable(),
+  TYPE: z.string().optional().nullable(),
 });
 
 export type ActivitiesListInput = z.infer<typeof activitiesListSchema>;

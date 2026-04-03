@@ -88,8 +88,9 @@ src/
 | POST | `/api/cn/actividades` | Auth | Listar actividades (filtros, paginación) |
 | POST | `/api/cn/actividades_crear` | activities.create | Crear actividad |
 | POST | `/api/cn/actividades_actualizar` | activities.update | Actualizar actividad |
-| POST | `/api/cn/actividades_completar` | activities.complete | Completar/cancelar actividad |
+| POST | `/api/cn/actividades_completar` | activities.complete | Completar/cancelar actividad (acepta notas y coordenadas GPS) |
 | POST | `/api/cn/actividades_asignar` | activities.assign | Asignar actividad a usuario |
+| POST | `/api/cn/actividades_checkins` | Auth | Listar check-ins de actividades completadas (filtros: fecha, tipo, usuario) |
 | GET | `/api/cn/actividades_tipos` | Auth | Catálogo de tipos de actividad |
 
 ### Oportunidades
@@ -224,6 +225,8 @@ Archivos disponibles en `sql/`:
 | `add-read-permissions.sql` | Agrega permisos de lectura a roles existentes |
 | `add_activity_permissions.sql` | Permisos de actividades |
 | `add_assign_permission.sql` | Permiso de asignación de actividades |
+| `add_activity_checkin.sql` | Columnas de check-in GPS en actividades |
+| `add_sucursalid_to_view.sql` | Agrega SUCURSALID a la vista vw_cn_clientes |
 | `add_notifications_table.sql` | Tabla de notificaciones |
 | `add_products_updatedAt.sql` | Columna updatedAt en productos |
 | `create_report_tables.sql` | Tablas de reportes |
@@ -279,3 +282,6 @@ Flujo completo implementado:
 - Las actividades cambian de status automáticamente: si se asigna fecha pasa a "Programada", si se quita vuelve a "Pendiente"
 - El servicio de email usa nodemailer con SMTP (configurado para Gmail con App Password)
 - Los tokens de recuperación expiran en 1 hora y son de un solo uso
+- **Check-in GPS**: al completar Visita/Reunion se requiere nota mínima de 10 caracteres. Las notas se append al campo existente con separador `--- Check-in ---`
+- **Vista vw_cn_clientes**: incluye `SUCURSALID` para filtrado correcto por ID de sucursal
+- **Precisión GPS**: se acepta cualquier precisión pero se advierte visualmente al usuario (>150m = advertencia ámbar)

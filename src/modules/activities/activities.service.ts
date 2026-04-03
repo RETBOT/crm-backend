@@ -321,6 +321,22 @@ export async function completeActivity(companyId: number, userId: number, input:
   const completedAt = input.STATUS === "Completada" ? "SYSUTCDATETIME()" : "NULL";
   const hasCheckIn = input.STATUS === "Completada" && input.CHECK_IN_LAT != null && input.CHECK_IN_LON != null;
 
+  if (input.STATUS === "Completada") {
+    const actType = await pool
+      .request()
+      .input("company_id", sql.Int, companyId)
+      .input("activity_id", sql.Int, input.ACTIVITY_ID)
+      .query<{ activity_type_code: string }>(`
+        SELECT activity_type_code FROM crm.activities
+        WHERE company_id = @company_id AND activity_id = @activity_id;
+      `);
+
+    const activityType = actType.recordset[0]?.activity_type_code;
+    if ((activityType === "Visita" || activityType === "Reunion") && (!input.NOTES || input.NOTES.trim().length < 10)) {
+      throw new HttpError(400, "Para visitas y reuniones, las notas deben tener al menos 10 caracteres");
+    }
+  }
+
   await pool
     .request()
     .input("company_id", sql.Int, companyId)
@@ -328,12 +344,20 @@ export async function completeActivity(companyId: number, userId: number, input:
     .input("status", sql.VarChar(20), input.STATUS)
     .input("check_in_lat", sql.Decimal(9, 6), hasCheckIn ? input.CHECK_IN_LAT : null)
     .input("check_in_lon", sql.Decimal(9, 6), hasCheckIn ? input.CHECK_IN_LON : null)
+    .input("notes", sql.NVarChar(1000), input.NOTES || null)
     .query(`
       UPDATE crm.activities
          SET status = @status,
              completed_at = ${completedAt},
              check_in_lat = @check_in_lat,
              check_in_lon = @check_in_lon,
+             notes = CASE
+               WHEN @notes IS NOT NULL AND LEN(@notes) > 0 AND notes IS NOT NULL AND LEN(notes) > 0
+                 THEN notes + CHAR(13) + CHAR(10) + CHAR(13) + CHAR(10) + '--- Check-in ---' + CHAR(13) + CHAR(10) + @notes
+               WHEN @notes IS NOT NULL AND LEN(@notes) > 0
+                 THEN @notes
+               ELSE notes
+             END,
              updated_at = SYSUTCDATETIME()
        WHERE company_id = @company_id
          AND activity_id = @activity_id;
@@ -397,6 +421,7 @@ export async function getActivityCheckins(companyId: number, userId: number, inp
   const whereFrom = input.FROM_DATE ? "AND a.completed_at >= @from_date" : "";
   const whereTo = input.TO_DATE ? "AND a.completed_at <= @to_date" : "";
   const whereUser = input.USER_ID ? "AND a.owner_user_id = @user_id" : "";
+  const whereType = input.TYPE ? "AND a.activity_type_code = @type" : "";
 
   const scopeSql = buildScopeConditionSql("a");
 
@@ -409,6 +434,7 @@ export async function getActivityCheckins(companyId: number, userId: number, inp
     .input("from_date", sql.DateTime2, input.FROM_DATE ? new Date(input.FROM_DATE) : null)
     .input("to_date", sql.DateTime2, input.TO_DATE ? new Date(input.TO_DATE) : null)
     .input("user_id", sql.Int, input.USER_ID ?? null)
+    .input("type", sql.VarChar(20), input.TYPE || null)
     .query(`
       SELECT
         a.activity_id AS ACTIVITYID,
@@ -419,6 +445,7 @@ export async function getActivityCheckins(companyId: number, userId: number, inp
         a.activity_type_code AS TYPE,
         aty.activity_type_name AS TYPE_NAME,
         a.subject AS SUBJECT,
+        a.notes AS NOTES,
         a.check_in_lat AS CHECK_IN_LAT,
         a.check_in_lon AS CHECK_IN_LON,
         a.completed_at AS COMPLETED_AT,
@@ -436,6 +463,7 @@ export async function getActivityCheckins(companyId: number, userId: number, inp
         ${whereFrom}
         ${whereTo}
         ${whereUser}
+        ${whereType}
       ORDER BY a.completed_at DESC;
     `);
 
