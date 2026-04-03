@@ -131,7 +131,13 @@ export async function resolveUserScope(companyId: number, userId: number): Promi
   }
 
   if (configured.scopeType === "ALL") {
-    return { scopeType: "ALL", branchIds: [], routeIds: [], branchIdsCsv: "", routeIdsCsv: "" };
+    return { 
+      scopeType: "ALL", 
+      branchIds: configured.branchIds,
+      routeIds: configured.routeIds,
+      branchIdsCsv: toCsv(configured.branchIds),
+      routeIdsCsv: toCsv(configured.routeIds)
+    };
   }
 
   const branchIds = configured.branchIds;

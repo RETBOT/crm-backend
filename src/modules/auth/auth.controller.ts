@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { forgotPasswordSchema, loginSchema } from "./auth.schemas";
-import { buildLoginPayload, forgotPassword, validateUser } from "./auth.service";
+import { forgotPasswordSchema, loginSchema, resetPasswordSchema } from "./auth.schemas";
+import { buildLoginPayload, forgotPassword, resetPasswordWithToken, validateUser } from "./auth.service";
 import { loginError, loginSuccess } from "../../shared/legacy-response";
 
 export async function loginAccess(req: Request, res: Response): Promise<void> {
@@ -31,4 +31,10 @@ export async function forgotPwd(req: Request, res: Response): Promise<void> {
   const parsed = forgotPasswordSchema.parse(req.body);
   const result = await forgotPassword(parsed.username, parsed.email);
   res.json(result);
+}
+
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  const parsed = resetPasswordSchema.parse(req.body);
+  await resetPasswordWithToken(parsed.token, parsed.newPassword);
+  res.json({ message: "Contraseña actualizada correctamente" });
 }

@@ -200,6 +200,7 @@ interface ScheduledReportRow {
 
 // Función helper para construir condición de alcance
 function scopeSql(alias: string): string {
+  // Cuando scope_type = 'ALL', permitir ver todos los registros sin filtrar por branch/ruta
   return `
     (
       @scope_type = 'ALL'
@@ -208,6 +209,7 @@ function scopeSql(alias: string): string {
           SELECT TRY_CAST(value AS INT)
           FROM STRING_SPLIT(@branch_ids_csv, ',')
           WHERE TRY_CAST(value AS INT) IS NOT NULL
+          AND @branch_ids_csv != ''
         )
         AND (
           @scope_type = 'BRANCH'
@@ -215,6 +217,7 @@ function scopeSql(alias: string): string {
             SELECT TRY_CAST(value AS INT)
             FROM STRING_SPLIT(@route_ids_csv, ',')
             WHERE TRY_CAST(value AS INT) IS NOT NULL
+            AND @route_ids_csv != ''
           )
         )
       )
@@ -224,21 +227,53 @@ function scopeSql(alias: string): string {
 
 // Función helper para construir parámetros base
 function buildRequestParams(pool: any, companyId: number, scope: any) {
+  const branchIdsCsv = scope.scopeType === 'ALL' ? '' : (scope.branchIdsCsv || '');
+  const routeIdsCsv = scope.scopeType === 'ALL' ? '' : (scope.routeIdsCsv || '');
+  
   return pool
     .request()
     .input("company_id", sql.Int, companyId)
     .input("scope_type", sql.VarChar(10), scope.scopeType)
-    .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
-    .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv);
+    .input("branch_ids_csv", sql.VarChar(sql.MAX), branchIdsCsv)
+    .input("route_ids_csv", sql.VarChar(sql.MAX), routeIdsCsv);
 }
 
 // Función helper para agregar filtros de fecha
 function addDateFilters(request: any, filters: ReportFilterInput) {
   if (filters.START_DATE) {
     request.input("start_date", sql.Date, new Date(filters.START_DATE));
+  } else {
+    request.input("start_date", sql.Date, null);
   }
   if (filters.END_DATE) {
     request.input("end_date", sql.Date, new Date(filters.END_DATE));
+  } else {
+    request.input("end_date", sql.Date, null);
+  }
+  if (filters.STATUS) {
+    request.input("status", sql.VarChar(20), filters.STATUS);
+  } else {
+    request.input("status", sql.VarChar(20), null);
+  }
+  if (filters.STAGE_IDS?.length > 0) {
+    request.input("stage_ids_csv", sql.VarChar(sql.MAX), filters.STAGE_IDS.join(","));
+  } else {
+    request.input("stage_ids_csv", sql.VarChar(sql.MAX), null);
+  }
+  if (filters.MIN_AMOUNT) {
+    request.input("min_amount", sql.Decimal(18,2), filters.MIN_AMOUNT);
+  } else {
+    request.input("min_amount", sql.Decimal(18,2), null);
+  }
+  if (filters.MAX_AMOUNT) {
+    request.input("max_amount", sql.Decimal(18,2), filters.MAX_AMOUNT);
+  } else {
+    request.input("max_amount", sql.Decimal(18,2), null);
+  }
+  if (filters.SEARCH) {
+    request.input("search", sql.VarChar(100), filters.SEARCH);
+  } else {
+    request.input("search", sql.VarChar(100), null);
   }
   return request;
 }
@@ -521,9 +556,8 @@ export async function getSalesReport(companyId: number, userId: number, filters:
   let request = buildRequestParams(pool, companyId, scope);
   request = addDateFilters(request, filters);
 
-  if (filters.USER_IDS && filters.USER_IDS.length > 0) {
-    request.input("user_ids_csv", sql.VarChar(sql.MAX), filters.USER_IDS.join(","));
-  }
+  request.input("user_ids_csv", sql.VarChar(sql.MAX), 
+    filters.USER_IDS?.length > 0 ? filters.USER_IDS.join(",") : null);
 
   const result = await request.query(`
     SELECT
@@ -543,6 +577,13 @@ export async function getSalesReport(companyId: number, userId: number, filters:
       AND o.status = 'ganada'
       AND (@start_date IS NULL OR o.close_date >= @start_date)
       AND (@end_date IS NULL OR o.close_date <= @end_date)
+      AND (@status IS NULL OR o.status = @status)
+      AND (@stage_ids_csv IS NULL OR o.stage_id IN (
+        SELECT TRY_CAST(value AS INT) FROM STRING_SPLIT(@stage_ids_csv, ',')
+      ))
+      AND (@min_amount IS NULL OR o.amount >= @min_amount)
+      AND (@max_amount IS NULL OR o.amount <= @max_amount)
+      AND (@search IS NULL OR c.customer_name LIKE '%' + @search + '%')
       AND ${scopeSql("c")}
       AND (@user_ids_csv IS NULL OR u.user_id IN (
         SELECT TRY_CAST(value AS INT) FROM STRING_SPLIT(@user_ids_csv, ',')
@@ -550,6 +591,11 @@ export async function getSalesReport(companyId: number, userId: number, filters:
     GROUP BY FORMAT(o.close_date, 'yyyy-MM'), u.display_name, b.branch_name
     ORDER BY period DESC, total_sales DESC;
   `);
+
+  console.log("[DEBUG getSalesReport] SQL Result rows:", result.recordset.length);
+  if (result.recordset.length > 0) {
+    console.log("[DEBUG getSalesReport] First row:", JSON.stringify(result.recordset[0]));
+  }
 
   // Totales
   const totals = {
@@ -650,25 +696,52 @@ export async function getCustomersReport(
     ORDER BY days_inactive DESC;
   `);
 
-  // Resumen
-  const summaryRes = await request.query(`
-    SELECT
-      COUNT(DISTINCT CASE WHEN c.customer_type = 'CLIENTE' THEN c.customer_id END) AS total_customers,
-      COUNT(DISTINCT CASE WHEN c.customer_type = 'PROSPECTO' THEN c.customer_id END) AS total_prospects,
-      COUNT(DISTINCT CASE 
-        WHEN c.customer_type = 'CLIENTE' 
-        AND EXISTS (
-          SELECT 1 FROM crm.opportunities o 
-          WHERE o.company_id = c.company_id 
-          AND o.customer_id = c.customer_id 
-          AND o.status = 'ganada'
-          AND o.close_date >= DATEADD(MONTH, -3, GETDATE())
-        ) THEN c.customer_id 
-      END) AS active_last_3_months
-    FROM crm.customers c
-    WHERE c.company_id = @company_id
-      AND ${scopeSql("c")};
-  `);
+  // Resumen - corregido para evitar error de aggregate con subquery
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0];
+  
+  const summaryRes = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("scope_type", sql.VarChar(10), scope.scopeType)
+    .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
+    .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
+    .input("three_months_ago", sql.Date, new Date(threeMonthsAgoStr))
+    .query(`
+      SELECT
+        COUNT(DISTINCT CASE WHEN c.customer_type = 'CLIENTE' THEN c.customer_id END) AS total_customers,
+        COUNT(DISTINCT CASE WHEN c.customer_type = 'PROSPECTO' THEN c.customer_id END) AS total_prospects,
+        (SELECT COUNT(DISTINCT c2.customer_id)
+         FROM crm.customers c2
+         LEFT JOIN crm.routes r2 ON r2.company_id = c2.company_id AND r2.branch_id = c2.branch_id
+         WHERE c2.company_id = @company_id
+           AND c2.customer_type = 'CLIENTE'
+           AND EXISTS (
+             SELECT 1 FROM crm.opportunities o 
+             WHERE o.company_id = c2.company_id 
+               AND o.customer_id = c2.customer_id 
+               AND o.status = 'ganada'
+               AND o.close_date >= @three_months_ago
+           )
+           AND (
+             @scope_type = 'ALL'
+             OR c2.branch_id IN (
+               SELECT TRY_CAST(value AS INT) FROM STRING_SPLIT(@branch_ids_csv, ',')
+               WHERE TRY_CAST(value AS INT) IS NOT NULL
+             )
+           )
+        ) AS active_last_3_months
+      FROM crm.customers c
+      WHERE c.company_id = @company_id
+        AND (
+          @scope_type = 'ALL'
+          OR c.branch_id IN (
+            SELECT TRY_CAST(value AS INT) FROM STRING_SPLIT(@branch_ids_csv, ',')
+            WHERE TRY_CAST(value AS INT) IS NOT NULL
+          )
+        );
+    `);
 
   const summary = (summaryRes.recordset[0] as CustomerSummaryRow) || {
     total_customers: 0,
@@ -742,7 +815,7 @@ export async function getActivitiesReport(
       COUNT(*) AS count
     FROM crm.activities a
     INNER JOIN crm.customers c ON c.company_id = a.company_id AND c.customer_id = a.customer_id
-    LEFT JOIN sec.users u ON u.company_id = a.company_id AND u.user_id = a.assigned_to_user_id
+    LEFT JOIN sec.users u ON u.company_id = a.company_id AND u.user_id = a.owner_user_id
     WHERE a.company_id = @company_id
       AND (@start_date IS NULL OR a.created_at >= @start_date)
       AND (@end_date IS NULL OR a.created_at <= @end_date)
@@ -763,7 +836,7 @@ export async function getActivitiesReport(
       u.display_name AS assigned_to
     FROM crm.activities a
     INNER JOIN crm.customers c ON c.company_id = a.company_id AND c.customer_id = a.customer_id
-    LEFT JOIN sec.users u ON u.company_id = a.company_id AND u.user_id = a.assigned_to_user_id
+    LEFT JOIN sec.users u ON u.company_id = a.company_id AND u.user_id = a.owner_user_id
     WHERE a.company_id = @company_id
       AND a.status IN ('Pendiente', 'Programada')
       AND a.due_at IS NOT NULL
@@ -855,6 +928,12 @@ export async function getOpportunitiesReport(
     INNER JOIN crm.customers c ON c.company_id = o.company_id AND c.customer_id = o.customer_id
     LEFT JOIN crm.pipeline_stages ps ON ps.company_id = o.company_id AND ps.stage_id = o.stage_id
     WHERE o.company_id = @company_id
+      AND (@status IS NULL OR o.status = @status)
+      AND (@stage_ids_csv IS NULL OR o.stage_id IN (
+        SELECT TRY_CAST(value AS INT) FROM STRING_SPLIT(@stage_ids_csv, ',')
+      ))
+      AND (@min_amount IS NULL OR o.amount >= @min_amount)
+      AND (@max_amount IS NULL OR o.amount <= @max_amount)
       AND o.status NOT IN ('ganada', 'perdida')
       AND (@start_date IS NULL OR o.created_at >= @start_date)
       AND (@end_date IS NULL OR o.created_at <= @end_date)
@@ -874,6 +953,12 @@ export async function getOpportunitiesReport(
       INNER JOIN crm.customers c ON c.company_id = o.company_id AND c.customer_id = o.customer_id
       LEFT JOIN crm.pipeline_stages ps ON ps.company_id = o.company_id AND ps.stage_id = o.stage_id
       WHERE o.company_id = @company_id
+        AND (@status IS NULL OR o.status = @status)
+        AND (@stage_ids_csv IS NULL OR o.stage_id IN (
+          SELECT TRY_CAST(value AS INT) FROM STRING_SPLIT(@stage_ids_csv, ',')
+        ))
+        AND (@min_amount IS NULL OR o.amount >= @min_amount)
+        AND (@max_amount IS NULL OR o.amount <= @max_amount)
         AND (@start_date IS NULL OR o.created_at >= @start_date)
         AND (@end_date IS NULL OR o.created_at <= @end_date)
         AND ${scopeSql("c")}
@@ -933,17 +1018,17 @@ export async function getOpportunitiesReport(
   const summaryRes = await request.query(`
     SELECT
       COUNT(*) AS total_opportunities,
-      SUM(CASE WHEN status = 'ganada' THEN 1 ELSE 0 END) AS won_count,
-      SUM(CASE WHEN status = 'perdida' THEN 1 ELSE 0 END) AS lost_count,
-      SUM(CASE WHEN status = 'abierta' THEN 1 ELSE 0 END) AS open_count,
-      SUM(CASE WHEN status = 'ganada' THEN ISNULL(amount, 0) ELSE 0 END) AS won_amount,
-      SUM(CASE WHEN status = 'abierta' THEN ISNULL(amount, 0) ELSE 0 END) AS pipeline_amount,
-      AVG(CASE WHEN status = 'ganada' THEN DATEDIFF(DAY, created_at, close_date) END) AS avg_days_to_close
+      SUM(CASE WHEN o.status = 'ganada' THEN 1 ELSE 0 END) AS won_count,
+      SUM(CASE WHEN o.status = 'perdida' THEN 1 ELSE 0 END) AS lost_count,
+      SUM(CASE WHEN o.status = 'abierta' THEN 1 ELSE 0 END) AS open_count,
+      SUM(CASE WHEN o.status = 'ganada' THEN ISNULL(o.amount, 0) ELSE 0 END) AS won_amount,
+      SUM(CASE WHEN o.status = 'abierta' THEN ISNULL(o.amount, 0) ELSE 0 END) AS pipeline_amount,
+      AVG(CASE WHEN o.status = 'ganada' THEN DATEDIFF(DAY, o.created_at, o.close_date) END) AS avg_days_to_close
     FROM crm.opportunities o
     INNER JOIN crm.customers c ON c.company_id = o.company_id AND c.customer_id = o.customer_id
     WHERE o.company_id = @company_id
-      AND (@start_date IS NULL OR created_at >= @start_date)
-      AND (@end_date IS NULL OR created_at <= @end_date)
+      AND (@start_date IS NULL OR o.created_at >= @start_date)
+      AND (@end_date IS NULL OR o.created_at <= @end_date)
       AND ${scopeSql("c")};
   `);
 
@@ -1021,7 +1106,7 @@ export async function getProductsReport(
     SELECT
       p.product_id,
       p.product_name,
-      p.category,
+      p.sku,
       SUM(ISNULL(oi.quantity, 0)) AS total_quantity,
       SUM(ISNULL(oi.quantity, 0) * ISNULL(oi.unit_price, 0)) AS total_sales,
       COUNT(DISTINCT o.opportunity_id) AS opportunity_count,
@@ -1035,14 +1120,14 @@ export async function getProductsReport(
       AND (@start_date IS NULL OR o.close_date >= @start_date)
       AND (@end_date IS NULL OR o.close_date <= @end_date)
       AND ${scopeSql("c")}
-    GROUP BY p.product_id, p.product_name, p.category
+    GROUP BY p.product_id, p.product_name, p.sku
     ORDER BY total_sales DESC;
   `);
 
-  // Por categoría
+  // Por categoría - agrupar por sku como alternativa
   const salesByCategoryRes = await request.query(`
     SELECT
-      ISNULL(p.category, 'Sin categoría') AS category,
+      ISNULL(p.sku, 'Sin SKU') AS category,
       SUM(ISNULL(oi.quantity, 0) * ISNULL(oi.unit_price, 0)) AS total_sales,
       COUNT(DISTINCT p.product_id) AS product_count,
       COUNT(DISTINCT o.opportunity_id) AS opportunity_count
@@ -1055,7 +1140,7 @@ export async function getProductsReport(
       AND (@start_date IS NULL OR o.close_date >= @start_date)
       AND (@end_date IS NULL OR o.close_date <= @end_date)
       AND ${scopeSql("c")}
-    GROUP BY ISNULL(p.category, 'Sin categoría')
+    GROUP BY ISNULL(p.sku, 'Sin SKU')
     ORDER BY total_sales DESC;
   `);
 
@@ -1091,7 +1176,7 @@ export async function getProductsReport(
     salesByProduct: (salesByProductRes.recordset as ProductSalesRow[]).map((row) => ({
       productId: row.product_id,
       productName: row.product_name,
-      category: row.category,
+      category: row.sku || 'Sin SKU',
       totalQuantity: Number(row.total_quantity),
       totalSales: Number(row.total_sales),
       opportunityCount: Number(row.opportunity_count),

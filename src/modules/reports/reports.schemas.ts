@@ -8,6 +8,9 @@ export const reportFilterSchema = z.object({
   USER_IDS: z.array(z.number()).optional().nullable(),
   PRODUCT_IDS: z.array(z.number()).optional().nullable(),
   STATUS: z.string().optional().nullable(),
+  STAGE_IDS: z.array(z.number()).optional().nullable(),
+  MIN_AMOUNT: z.number().optional().nullable(),
+  MAX_AMOUNT: z.number().optional().nullable(),
   SEARCH: z.string().optional().default(""),
   // Para comparativas
   COMPARE_START_DATE: z.string().optional().nullable(),

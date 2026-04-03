@@ -43,4 +43,12 @@ export const env = {
     encrypt: getBoolean("SQL_ENCRYPT", false),
     trustServerCertificate: getBoolean("SQL_TRUST_CERT", true),
   },
+  smtp: {
+    host: getEnv("SMTP_HOST"),
+    port: getNumber("SMTP_PORT", 587),
+    user: getEnv("SMTP_USER"),
+    pass: getEnv("SMTP_PASS"),
+    from: getEnv("SMTP_FROM"),
+  },
+  appUrl: getEnv("APP_URL", "http://localhost:5173"),
 };

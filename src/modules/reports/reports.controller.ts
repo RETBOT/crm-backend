@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { abcError, abcSuccess } from "../../shared/legacy-response";
 import { PERMISSIONS } from "../auth/permissions";
+import { logger } from "../../config/logger";
 import {
   reportFilterSchema,
   exportReportSchema,
@@ -49,6 +50,7 @@ export async function getDashboardHandler(req: Request, res: Response): Promise<
     const data = await getDashboardExecutive(req.auth!.companyId, req.auth!.userId, filters);
     res.json({ resultado: 1, data });
   } catch (error: any) {
+    logger.error({ error, body: req.body }, "Error getting dashboard");
     if (error.name === "ZodError") {
       res.status(400).json({ resultado: -1, msg: "Datos inválidos", errors: error.errors });
     } else {
@@ -69,6 +71,7 @@ export async function getSalesReportHandler(req: Request, res: Response): Promis
     const data = await getSalesReport(req.auth!.companyId, req.auth!.userId, filters);
     res.json({ resultado: 1, data });
   } catch (error: any) {
+    logger.error({ error, body: req.body }, "Error getting sales report");
     if (error.name === "ZodError") {
       res.status(400).json({ resultado: -1, msg: "Datos inválidos", errors: error.errors });
     } else {
@@ -89,6 +92,7 @@ export async function getCustomersReportHandler(req: Request, res: Response): Pr
     const data = await getCustomersReport(req.auth!.companyId, req.auth!.userId, filters);
     res.json({ resultado: 1, data });
   } catch (error: any) {
+    logger.error({ error, body: req.body }, "Error getting customers report");
     if (error.name === "ZodError") {
       res.status(400).json({ resultado: -1, msg: "Datos inválidos", errors: error.errors });
     } else {
@@ -109,6 +113,7 @@ export async function getActivitiesReportHandler(req: Request, res: Response): P
     const data = await getActivitiesReport(req.auth!.companyId, req.auth!.userId, filters);
     res.json({ resultado: 1, data });
   } catch (error: any) {
+    logger.error({ error, body: req.body }, "Error getting activities report");
     if (error.name === "ZodError") {
       res.status(400).json({ resultado: -1, msg: "Datos inválidos", errors: error.errors });
     } else {
@@ -129,6 +134,7 @@ export async function getOpportunitiesReportHandler(req: Request, res: Response)
     const data = await getOpportunitiesReport(req.auth!.companyId, req.auth!.userId, filters);
     res.json({ resultado: 1, data });
   } catch (error: any) {
+    logger.error({ error, body: req.body }, "Error getting opportunities report");
     if (error.name === "ZodError") {
       res.status(400).json({ resultado: -1, msg: "Datos inválidos", errors: error.errors });
     } else {
@@ -149,6 +155,7 @@ export async function getProductsReportHandler(req: Request, res: Response): Pro
     const data = await getProductsReport(req.auth!.companyId, req.auth!.userId, filters);
     res.json({ resultado: 1, data });
   } catch (error: any) {
+    logger.error({ error, body: req.body }, "Error getting products report");
     if (error.name === "ZodError") {
       res.status(400).json({ resultado: -1, msg: "Datos inválidos", errors: error.errors });
     } else {
