@@ -2,11 +2,11 @@
 -- Ejecutar después de desplegar el código nuevo
 
 -- 1. Insertar los nuevos permisos en sec.permissions (si no existen)
-INSERT INTO sec.permissions (permission_key, description)
+INSERT INTO sec.permissions (permission_key, permission_description)
 SELECT 'customers.read', 'Ver lista de clientes'
 WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'customers.read');
 
-INSERT INTO sec.permissions (permission_key, description)
+INSERT INTO sec.permissions (permission_key, permission_description)
 SELECT 'prospects.read', 'Ver lista de prospectos'
 WHERE NOT EXISTS (SELECT 1 FROM sec.permissions WHERE permission_key = 'prospects.read');
 
