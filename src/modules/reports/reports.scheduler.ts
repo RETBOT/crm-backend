@@ -1,9 +1,9 @@
 import cron from "node-cron";
 import nodemailer from "nodemailer";
 import ExcelJS from "exceljs";
-import { getPool, sql } from "../db/sqlserver";
-import { env } from "../config/env";
-import { logger } from "../config/logger";
+import { getPool, sql } from "../../db/sqlserver";
+import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 import {
   getDashboardExecutive,
   getSalesReport,
@@ -132,6 +132,19 @@ function calculateNextRun(frequency: string, dayOfWeek?: number, dayOfMonth?: nu
   return next;
 }
 
+interface ScheduledReportRow {
+  schedule_id: number;
+  company_id: number;
+  user_id: number;
+  report_type: string;
+  frequency: string;
+  day_of_week: number | null;
+  day_of_month: number | null;
+  recipients: string;
+  filters: string;
+  next_run_at: Date;
+}
+
 export function startReportScheduler(): void {
   logger.info("Report scheduler started");
 
@@ -139,27 +152,15 @@ export function startReportScheduler(): void {
   cron.schedule("* * * * *", async () => {
     try {
       const pool = await getPool();
-      const now = new Date();
 
-      const result = await pool.request().query<{
-        scheduled_id: number;
-        company_id: number;
-        user_id: number;
-        report_type: string;
-        frequency: string;
-        day_of_week: number | null;
-        day_of_month: number | null;
-        recipients: string;
-        filters: string;
-        next_run_at: Date;
-      }(`
-        SELECT scheduled_id, company_id, user_id, report_type, frequency,
+      const result = await pool.request().query(`
+        SELECT schedule_id, company_id, user_id, report_type, frequency,
                day_of_week, day_of_month, recipients, filters, next_run_at
         FROM crm.report_scheduled
         WHERE is_active = 1 AND next_run_at <= SYSUTCDATETIME();
       `);
 
-      for (const row of result.recordset) {
+      for (const row of result.recordset as ScheduledReportRow[]) {
         try {
           const filters = row.filters ? JSON.parse(row.filters) : {};
           const recipients = row.recipients.split(",").map((r: string) => r.trim());
@@ -181,17 +182,17 @@ export function startReportScheduler(): void {
           const nextRun = calculateNextRun(row.frequency, row.day_of_week ?? undefined, row.day_of_month ?? undefined);
           await pool
             .request()
-            .input("scheduled_id", sql.Int, row.scheduled_id)
+            .input("schedule_id", sql.Int, row.schedule_id)
             .input("next_run_at", sql.DateTime2, nextRun)
             .query(`
               UPDATE crm.report_scheduled
               SET next_run_at = @next_run_at, last_run_at = SYSUTCDATETIME()
-              WHERE scheduled_id = @scheduled_id;
+              WHERE schedule_id = @schedule_id;
             `);
 
-          logger.info({ scheduled_id: row.scheduled_id, nextRun }, "Scheduled report processed");
+          logger.info({ schedule_id: row.schedule_id, nextRun }, "Scheduled report processed");
         } catch (err) {
-          logger.error({ scheduled_id: row.scheduled_id, error: err }, "Error processing scheduled report");
+          logger.error({ schedule_id: (row as any).schedule_id, error: err }, "Error processing scheduled report");
         }
       }
     } catch (err) {

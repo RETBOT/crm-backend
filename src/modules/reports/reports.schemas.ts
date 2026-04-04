@@ -42,13 +42,13 @@ export const exportReportSchema = z.object({
 export const savedViewSchema = z.object({
   VIEW_NAME: z.string().min(1).max(100),
   REPORT_TYPE: reportTypeSchema,
-  FILTERS: reportFilterSchema,
+  FILTERS: z.union([reportFilterSchema, z.string()]).optional(),
   IS_DEFAULT: z.boolean().optional().default(false),
 });
 
 export const savedViewUpdateSchema = z.object({
   VIEW_NAME: z.string().min(1).max(100).optional(),
-  FILTERS: reportFilterSchema.optional(),
+  FILTERS: z.union([reportFilterSchema, z.string()]).optional(),
   IS_DEFAULT: z.boolean().optional(),
 });
 

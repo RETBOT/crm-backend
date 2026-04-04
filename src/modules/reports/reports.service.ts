@@ -674,6 +674,7 @@ export async function getCustomersReport(
 
   // Clientes inactivos (sin compras en los últimos X días)
   const inactiveDays = 90;
+  const threeMonthsAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
 
   const inactiveCustomersResult = await pool
     .request()
@@ -682,6 +683,7 @@ export async function getCustomersReport(
     .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
     .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
     .input("inactive_days", sql.Int, inactiveDays)
+    .input("three_months_ago", sql.Date, threeMonthsAgo)
     .query(`
       SELECT
         COUNT(DISTINCT CASE WHEN c.customer_type = 'CLIENTE' THEN c.customer_id END) AS total_customers,
@@ -700,20 +702,20 @@ export async function getCustomersReport(
            )
            AND (
              @scope_type = 'ALL'
-             OR c2.branch_id IN (
+             OR (@branch_ids_csv = '' OR c2.branch_id IN (
                SELECT TRY_CAST(value AS INT) FROM STRING_SPLIT(@branch_ids_csv, ',')
                WHERE TRY_CAST(value AS INT) IS NOT NULL
-             )
+             ))
            )
         ) AS active_last_3_months
       FROM crm.customers c
       WHERE c.company_id = @company_id
         AND (
           @scope_type = 'ALL'
-          OR c.branch_id IN (
+          OR (@branch_ids_csv = '' OR c.branch_id IN (
             SELECT TRY_CAST(value AS INT) FROM STRING_SPLIT(@branch_ids_csv, ',')
             WHERE TRY_CAST(value AS INT) IS NOT NULL
-          )
+          ))
         );
     `);
 

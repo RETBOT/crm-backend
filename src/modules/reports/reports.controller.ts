@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { getPool, sql } from "../../db/sqlserver";
 import ExcelJS from "exceljs";
+import PDFDocument from "pdfkit";
 import { abcError, abcSuccess } from "../../shared/legacy-response";
 import { PERMISSIONS } from "../auth/permissions";
 import { logger } from "../../config/logger";
@@ -170,6 +171,286 @@ export async function getProductsReportHandler(req: Request, res: Response): Pro
 // EXPORTACIÓN
 // ============================================
 
+// Helper: Extraer estructura del reporte
+function flattenReportData(reportType: string, data: any) {
+  const result: { summary: any[]; charts: { name: string; data: any[] }[]; detail: any[] } = {
+    summary: [],
+    charts: [],
+    detail: [],
+  };
+
+  if (!data) return result;
+
+  // Dashboard: { kpi: {...}, charts: {...} }
+  if (data.kpi) {
+    for (const [key, value] of Object.entries(data.kpi as Record<string, any>)) {
+      if (value && typeof value === "object") {
+        result.summary.push({
+          métrica: key.replace(/_/g, " ").toUpperCase(),
+          actual: value.current ?? "",
+          anterior: value.previous ?? "",
+          cambio: value.change ? `${value.change > 0 ? "+" : ""}${value.change.toFixed(1)}%` : "",
+        });
+      }
+    }
+  }
+  if (data.charts) {
+    for (const [name, chartData] of Object.entries(data.charts as Record<string, any>)) {
+      if (Array.isArray(chartData) && chartData.length > 0) {
+        result.charts.push({ name: name.replace(/_/g, " ").toUpperCase(), data: chartData });
+      }
+    }
+  }
+
+  // Reports with data array: { data: [...], totals: {...} }
+  if (Array.isArray(data.data)) {
+    result.detail = data.data;
+    if (data.totals) {
+      result.summary = Object.entries(data.totals).map(([key, value]) => ({
+        métrica: key.replace(/_/g, " ").toUpperCase(),
+        valor: typeof value === "number" ? value.toLocaleString("es-MX") : String(value),
+      }));
+    }
+  }
+
+  // Fallback: si no hay estructura conocida, convertir todo en detalle
+  if (result.detail.length === 0 && result.summary.length === 0 && result.charts.length === 0) {
+    if (Array.isArray(data)) {
+      result.detail = data;
+    } else if (typeof data === "object") {
+      result.detail = Object.entries(data).map(([key, value]) => ({
+        campo: key,
+        valor: typeof value === "object" ? JSON.stringify(value) : String(value),
+      }));
+    }
+  }
+
+  return result;
+}
+
+// Helper: Calcular anchos de columna para PDF
+function calculatePDFColWidths(headers: string[], rowCount: number, pageWidth: number, margins: number) {
+  const availableWidth = pageWidth - margins;
+  const baseWidth = availableWidth / headers.length;
+  // Limitar entre 40 y 150px
+  return headers.map(() => Math.max(40, Math.min(baseWidth, 150)));
+}
+
+// Helper: Agregar tabla al PDF
+function addPDFTable(doc: any, headers: string[], rows: any[], colWidths: number[], startY?: number) {
+  const rowHeight = 16;
+  const totalWidth = colWidths.reduce((a, b) => a + b, 0);
+  const startX = (doc.page.width - doc.page.margins.left - doc.page.margins.right - totalWidth) / 2 + doc.page.margins.left;
+
+  // Headers
+  const headerY = startY !== undefined ? startY : doc.y;
+  if (headerY + rowHeight > doc.page.height - doc.page.margins.bottom - 20) {
+    doc.addPage();
+    return addPDFTable(doc, headers, rows, colWidths, doc.page.margins.top);
+  }
+
+  doc.rect(startX, headerY, totalWidth, rowHeight).fill("#4472C4");
+  doc.fillColor("#FFFFFF").fontSize(7).font("Helvetica-Bold");
+
+  let xPos = startX;
+  headers.forEach((header, i) => {
+    doc.text(header.substring(0, 20), xPos + 2, headerY + 3, {
+      width: colWidths[i] - 4,
+      align: "center",
+    });
+    xPos += colWidths[i];
+  });
+
+  // Rows
+  doc.fillColor("#000000").fontSize(7).font("Helvetica");
+  rows.forEach((row, rowIndex) => {
+    const y = doc.y;
+    if (y + rowHeight > doc.page.height - doc.page.margins.bottom - 20) {
+      doc.addPage();
+      doc.rect(startX, doc.page.margins.top, totalWidth, rowHeight).fill("#4472C4");
+      doc.fillColor("#FFFFFF").fontSize(7).font("Helvetica-Bold");
+      xPos = startX;
+      headers.forEach((header, i) => {
+        doc.text(header.substring(0, 20), xPos + 2, doc.page.margins.top + 3, {
+          width: colWidths[i] - 4,
+          align: "center",
+        });
+        xPos += colWidths[i];
+      });
+      doc.fillColor("#000000").fontSize(7).font("Helvetica");
+      doc.y = doc.page.margins.top + rowHeight;
+    }
+
+    if (rowIndex % 2 === 0) {
+      doc.rect(startX, doc.y, totalWidth, rowHeight).fill("#F5F5F5");
+    }
+
+    doc.fillColor("#000000");
+    xPos = startX;
+    headers.forEach((header, i) => {
+      const val = row[header];
+      const text = val === null || val === undefined ? "" :
+                   typeof val === "object" ? JSON.stringify(val).substring(0, 20) : String(val).substring(0, 20);
+      doc.text(text, xPos + 2, doc.y + 2, {
+        width: colWidths[i] - 4,
+        align: "center",
+      });
+      xPos += colWidths[i];
+    });
+
+    doc.y += rowHeight;
+  });
+
+  doc.moveDown(1);
+}
+
+// Generar PDF multi-sección
+async function generatePDFMultiSection(reportType: string, data: any): Promise<Buffer> {
+  return new Promise((resolve) => {
+    const useLandscape = reportType === "dashboard" || reportType === "opportunities";
+    const doc = new PDFDocument({
+      margin: 40,
+      size: "letter",
+      layout: useLandscape ? "landscape" : "portrait",
+    });
+    const chunks: Buffer[] = [];
+
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+
+    const flattened = flattenReportData(reportType, data);
+
+    // Header
+    doc.fontSize(20).font("Helvetica-Bold").text("RETFlow CRM", { align: "center" });
+    doc.fontSize(12).font("Helvetica").text(`Reporte: ${reportType.toUpperCase()}`, { align: "center" });
+    doc.fontSize(9).text(`Generado: ${new Date().toLocaleString("es-MX")}`, { align: "center" });
+    doc.moveDown(1);
+
+    // Sección: Resumen / KPIs
+    if (flattened.summary.length > 0) {
+      doc.fontSize(14).font("Helvetica-Bold").text("Resumen", { underline: true });
+      doc.moveDown(0.5);
+      const headers = Object.keys(flattened.summary[0]);
+      const colWidths = calculatePDFColWidths(headers, flattened.summary.length, doc.page.width, 80);
+      addPDFTable(doc, headers, flattened.summary, colWidths);
+      doc.moveDown(1);
+    }
+
+    // Sección: Gráficos como tablas
+    for (const chart of flattened.charts) {
+      if (chart.data.length > 0) {
+        // Verificar si necesitamos nueva página
+        if (doc.y > doc.page.height - 150) {
+          doc.addPage();
+        }
+        doc.fontSize(12).font("Helvetica-Bold").text(chart.name, { underline: true });
+        doc.moveDown(0.5);
+        const headers = Object.keys(chart.data[0]);
+        const colWidths = calculatePDFColWidths(headers, chart.data.length, doc.page.width, 80);
+        addPDFTable(doc, headers, chart.data.slice(0, 20), colWidths); // Máx 20 filas por chart
+        doc.moveDown(1);
+      }
+    }
+
+    // Sección: Datos detallados
+    if (flattened.detail.length > 0) {
+      if (doc.y > doc.page.height - 100) {
+        doc.addPage();
+      }
+      doc.fontSize(14).font("Helvetica-Bold").text("Datos Detallados", { underline: true });
+      doc.moveDown(0.5);
+      const headers = Object.keys(flattened.detail[0]);
+      const colWidths = calculatePDFColWidths(headers, Math.min(flattened.detail.length, 50), doc.page.width, 80);
+      addPDFTable(doc, headers, flattened.detail.slice(0, 100), colWidths); // Máx 100 filas
+    }
+
+    // Footer simple al final
+    doc.moveDown(1);
+    doc.fontSize(7).text(
+      `© ${new Date().getFullYear()} RETFlow CRM — Todos los derechos reservados`,
+      { align: "center" }
+    );
+
+    doc.end();
+  });
+}
+
+// Generar Excel multi-hoja
+async function generateExcelMultiSheet(reportType: string, data: any): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const flattened = flattenReportData(reportType, data);
+
+  // Función helper para agregar hoja con formato
+  function addFormattedSheet(name: string, headers: string[], rows: any[]) {
+    if (rows.length === 0) return;
+    const ws = workbook.addWorksheet(name.substring(0, 31)); // Max 31 chars
+
+    // Headers
+    ws.columns = headers.map((h) => ({
+      header: h.replace(/_/g, " ").toUpperCase(),
+      key: h,
+    }));
+
+    // Header styling
+    ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+    ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    ws.getRow(1).alignment = { vertical: "middle", horizontal: "center" };
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+
+    // Rows
+    rows.forEach((row, i) => {
+      const rowNum = i + 2;
+      const serialized: any = {};
+      for (const [key, value] of Object.entries(row)) {
+        serialized[key] = value === null || value === undefined ? "" :
+                          typeof value === "object" ? JSON.stringify(value) : value;
+      }
+      const excelRow = ws.addRow(serialized);
+      if (i % 2 === 0) {
+        excelRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } };
+      }
+      excelRow.alignment = { vertical: "middle" };
+    });
+
+    // Auto-width
+    ws.columns.forEach((col: any) => {
+      if (col) {
+        let maxLen = 10;
+        col.eachCell?.({ includeEmpty: false }, (cell: any) => {
+          maxLen = Math.max(maxLen, String(cell.value).length);
+        });
+        col.width = Math.min(maxLen + 4, 40);
+      }
+    });
+  }
+
+  // Hoja 1: Resumen
+  if (flattened.summary.length > 0) {
+    addFormattedSheet("Resumen", Object.keys(flattened.summary[0]), flattened.summary);
+  }
+
+  // Hojas 2+: Gráficos
+  for (const chart of flattened.charts) {
+    if (chart.data.length > 0) {
+      addFormattedSheet(chart.name.substring(0, 31), Object.keys(chart.data[0]), chart.data);
+    }
+  }
+
+  // Hoja final: Datos detallados
+  if (flattened.detail.length > 0) {
+    addFormattedSheet("Datos", Object.keys(flattened.detail[0]), flattened.detail);
+  }
+
+  // Si no hay datos, crear hoja vacía con mensaje
+  if (workbook.worksheets.length === 0) {
+    const ws = workbook.addWorksheet("Sin datos");
+    ws.getCell("A1").value = "No hay datos disponibles para este reporte";
+    ws.getCell("A1").font = { italic: true, color: { argb: "FF999999" } };
+  }
+
+  return await workbook.xlsx.writeBuffer();
+}
+
 export async function exportReportHandler(req: Request, res: Response): Promise<void> {
   if (!hasPermission(req, PERMISSIONS.REPORTS_EXPORT)) {
     res.status(403).json(abcError("No tiene permisos para exportar reportes"));
@@ -209,67 +490,41 @@ export async function exportReportHandler(req: Request, res: Response): Promise<
         return;
     }
 
-    // Normalizar datos del reporte
-    const reportData = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
-
-    // Generar archivo real según el formato
-    if (input.FORMAT === "excel" && reportData.length > 0) {
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(`Reporte ${input.REPORT_TYPE}`);
-
-      // Crear headers desde las keys del primer objeto
-      const headers = Object.keys(reportData[0]).map((key) => ({
-        header: key.replace(/_/g, " ").toUpperCase(),
-        key: key,
-      }));
-      worksheet.columns = headers;
-
-      // Agregar filas
-      reportData.forEach((row: any) => {
-        worksheet.addRow(row);
-      });
-
-      // Formatear headers
-      worksheet.getRow(1).fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF4472C4" },
-      };
-      worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-
-      // Auto-width columns
-      worksheet.columns.forEach((col) => {
-        if (col) {
-          let maxLength = 0;
-          (col as any).eachCell?.({ includeEmpty: false }, (cell: any) => {
-            const length = cell.value ? String(cell.value).length : 10;
-            if (length > maxLength) maxLength = length;
-          });
-          col.width = Math.min(Math.max(maxLength + 2, 12), 50);
-        }
-      });
-
-      const buffer = await workbook.xlsx.writeBuffer();
+    // Generar archivo según formato
+    if (input.FORMAT === "excel") {
+      const buffer = await generateExcelMultiSheet(input.REPORT_TYPE, data);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="reporte_${input.REPORT_TYPE}_${new Date().toISOString().split("T")[0]}.xlsx"`);
       res.send(buffer);
-    } else if (input.FORMAT === "csv" && reportData.length > 0) {
-      const headers = Object.keys(reportData[0]);
-      const csvRows = [
-        headers.join(","),
-        ...reportData.map((row: any) =>
-          headers.map((h) => {
-            const val = row[h];
-            if (val === null || val === undefined) return "";
-            if (typeof val === "string" && val.includes(",")) return `"${val}"`;
-            return String(val);
-          }).join(",")
-        ),
-      ].join("\n");
+    } else if (input.FORMAT === "pdf") {
+      const pdfBuffer = await generatePDFMultiSection(input.REPORT_TYPE, data);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="reporte_${input.REPORT_TYPE}_${new Date().toISOString().split("T")[0]}.pdf"`);
+      res.send(pdfBuffer);
+    } else if (input.FORMAT === "csv") {
+      const flattened = flattenReportData(input.REPORT_TYPE, data);
+      const allData = [...flattened.summary, ...flattened.detail];
+      if (allData.length > 0) {
+        const headers = Object.keys(allData[0]);
+        const csvRows = [
+          headers.join(","),
+          ...allData.map((row: any) =>
+            headers.map((h) => {
+              const val = row[h];
+              if (val === null || val === undefined) return "";
+              if (typeof val === "object") return `"${JSON.stringify(val).replace(/"/g, '""')}"`;
+              if (typeof val === "string" && val.includes(",")) return `"${val}"`;
+              return String(val);
+            }).join(",")
+          ),
+        ].join("\n");
 
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="reporte_${input.REPORT_TYPE}_${new Date().toISOString().split("T")[0]}.csv"`);
-      res.send("\uFEFF" + csvRows); // BOM for UTF-8
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="reporte_${input.REPORT_TYPE}_${new Date().toISOString().split("T")[0]}.csv"`);
+        res.send("\uFEFF" + csvRows);
+      } else {
+        res.status(400).json(abcError("No hay datos para exportar"));
+      }
     } else {
       res.json({
         resultado: 1,
