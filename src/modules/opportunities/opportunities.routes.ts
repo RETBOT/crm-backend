@@ -8,6 +8,7 @@ import {
   postCreateOpportunity,
   postCreateOpportunityItem,
   postDeleteOpportunityItem,
+  deleteOpportunityHandler,
   postReopen,
   postSetStatus,
   postUpdateOpportunity,
@@ -19,6 +20,7 @@ const router = Router();
 router.post("/oportunidades", getOpportunities);
 router.post("/oportunidades_crear", postCreateOpportunity);
 router.post("/oportunidades_actualizar", postUpdateOpportunity);
+router.post("/oportunidades_eliminar", deleteOpportunityHandler);
 router.post("/oportunidades_avanzar", postAdvanceStage);
 router.post("/oportunidades_status", postSetStatus);
 router.post("/oportunidades_reabrir", postReopen);

@@ -5,6 +5,7 @@ import {
   opportunitiesListSchema,
   opportunityAdvanceSchema,
   opportunityCreateSchema,
+  opportunityDeleteSchema,
   opportunityItemSchema,
   opportunityStatusSchema,
   opportunityUpdateSchema,
@@ -14,6 +15,7 @@ import {
   advanceOpportunityStage,
   createOpportunity,
   createOpportunityItem,
+  deleteOpportunity,
   deleteOpportunityItem,
   getOpportunitiesByCustomer,
   getOpportunityItems,
@@ -149,4 +151,15 @@ export async function postDeleteOpportunityItem(req: Request, res: Response): Pr
   const itemId = Number(req.params.itemId);
   await deleteOpportunityItem(req.auth!.companyId, req.auth!.userId, oppId, itemId);
   res.json(abcSuccess("Ítem eliminado correctamente"));
+}
+
+export async function deleteOpportunityHandler(req: Request, res: Response): Promise<void> {
+  if (!hasPermission(req, PERMISSIONS.OPPORTUNITIES_DELETE)) {
+    res.status(403).json(abcError("No tiene permisos para eliminar oportunidades"));
+    return;
+  }
+
+  const input = opportunityDeleteSchema.parse(req.body ?? {});
+  await deleteOpportunity(req.auth!.companyId, req.auth!.userId, input.OPPORTUNITY_ID);
+  res.json(abcSuccess("Oportunidad eliminada correctamente"));
 }

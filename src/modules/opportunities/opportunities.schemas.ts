@@ -4,9 +4,18 @@ export const opportunitiesListSchema = z.object({
   CUSTOMER_ID: z.coerce.number().optional().nullable(),
   STATUS: z.string().optional().default(""),
   STAGE_ID: z.coerce.number().optional().nullable(),
+  OWNER_USER_ID: z.coerce.number().optional().nullable(),
+  CLOSE_DATE_FROM: z.string().optional().nullable(),
+  CLOSE_DATE_TO: z.string().optional().nullable(),
   SEARCH: z.string().optional().default(""),
   NPAG: z.coerce.number().optional().default(1),
   TPAG: z.coerce.number().optional().default(20),
+  SORT_BY: z.string().optional().default("stage_order"),
+  SORT_DIR: z.enum(["ASC", "DESC"]).optional().default("ASC"),
+});
+
+export const opportunityDeleteSchema = z.object({
+  OPPORTUNITY_ID: z.coerce.number(),
 });
 
 export const opportunityCreateSchema = z.object({
@@ -58,6 +67,7 @@ export const opportunityItemSchema = z.object({
 });
 
 export type OpportunitiesListInput = z.infer<typeof opportunitiesListSchema>;
+export type OpportunityDeleteInput = z.infer<typeof opportunityDeleteSchema>;
 export type OpportunityCreateInput = z.infer<typeof opportunityCreateSchema>;
 export type OpportunityUpdateInput = z.infer<typeof opportunityUpdateSchema>;
 export type OpportunityAdvanceInput = z.infer<typeof opportunityAdvanceSchema>;

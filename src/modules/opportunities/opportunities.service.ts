@@ -86,7 +86,10 @@ export async function listOpportunities(companyId: number, userId: number, input
   const whereCustomer = input.CUSTOMER_ID ? "AND o.customer_id = @customer_id" : "";
   const whereStatus = input.STATUS ? "AND o.status = @status" : "";
   const whereStage = input.STAGE_ID ? "AND o.stage_id = @stage_id" : "";
-  const whereSearch = input.SEARCH ? "AND (o.title LIKE @search OR c.customer_name LIKE @search)" : "";
+  const whereOwner = input.OWNER_USER_ID ? "AND o.owner_user_id = @owner_id" : "";
+  const whereDateFrom = input.CLOSE_DATE_FROM ? "AND o.close_date >= @close_date_from" : "";
+  const whereDateTo = input.CLOSE_DATE_TO ? "AND o.close_date <= @close_date_to" : "";
+  const whereSearch = input.SEARCH ? "AND (o.title LIKE @search OR c.customer_name LIKE @search OR o.description LIKE @search)" : "";
   const scopeSql = buildScopeConditionSql("o");
 
   const countResult = await pool
@@ -98,15 +101,26 @@ export async function listOpportunities(companyId: number, userId: number, input
     .input("customer_id", sql.Int, input.CUSTOMER_ID ?? null)
     .input("status", sql.VarChar(20), input.STATUS || "")
     .input("stage_id", sql.Int, input.STAGE_ID ?? null)
+    .input("owner_id", sql.Int, input.OWNER_USER_ID ?? null)
+    .input("close_date_from", sql.Date, input.CLOSE_DATE_FROM ? new Date(input.CLOSE_DATE_FROM) : null)
+    .input("close_date_to", sql.Date, input.CLOSE_DATE_TO ? new Date(input.CLOSE_DATE_TO + "T23:59:59") : null)
     .input("search", sql.NVarChar(200), input.SEARCH ? `%${input.SEARCH}%` : "")
     .query<{ total: number }>(`
       SELECT COUNT(1) AS total FROM crm.opportunities o
       INNER JOIN crm.customers c ON c.company_id = o.company_id AND c.customer_id = o.customer_id
-      WHERE o.company_id = @company_id AND ${scopeSql} ${whereCustomer} ${whereStatus} ${whereStage} ${whereSearch};
+      WHERE o.company_id = @company_id AND ${scopeSql} ${whereCustomer} ${whereStatus} ${whereStage} ${whereOwner} ${whereDateFrom} ${whereDateTo} ${whereSearch};
     `);
 
   const total = countResult.recordset[0]?.total ?? 0;
   const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+
+  const sortBy = input.SORT_BY || "stage_order";
+  const sortDir = input.SORT_DIR || "ASC";
+  const orderBy = sortBy === "amount" ? `o.amount ${sortDir}`
+    : sortBy === "close_date" ? `o.close_date ${sortDir}`
+    : sortBy === "probability" ? `o.probability_pct ${sortDir}`
+    : sortBy === "status" ? `o.status ${sortDir}`
+    : `ps.stage_order ASC, o.created_at DESC`;
 
   const dataResult = await pool
     .request()
@@ -117,6 +131,9 @@ export async function listOpportunities(companyId: number, userId: number, input
     .input("customer_id", sql.Int, input.CUSTOMER_ID ?? null)
     .input("status", sql.VarChar(20), input.STATUS || "")
     .input("stage_id", sql.Int, input.STAGE_ID ?? null)
+    .input("owner_id", sql.Int, input.OWNER_USER_ID ?? null)
+    .input("close_date_from", sql.Date, input.CLOSE_DATE_FROM ? new Date(input.CLOSE_DATE_FROM) : null)
+    .input("close_date_to", sql.Date, input.CLOSE_DATE_TO ? new Date(input.CLOSE_DATE_TO + "T23:59:59") : null)
     .input("search", sql.NVarChar(200), input.SEARCH ? `%${input.SEARCH}%` : "")
     .input("offset", sql.Int, offset)
     .input("page_size", sql.Int, pageSize)
@@ -137,8 +154,8 @@ export async function listOpportunities(companyId: number, userId: number, input
       LEFT JOIN crm.contacts ct ON ct.company_id = o.company_id AND ct.contact_id = o.contact_id
       LEFT JOIN sec.users u ON u.company_id = o.company_id AND u.user_id = o.owner_user_id
       LEFT JOIN crm.pipeline_stages ps ON ps.stage_id = o.stage_id
-      WHERE o.company_id = @company_id AND ${scopeSql} ${whereCustomer} ${whereStatus} ${whereStage} ${whereSearch}
-      ORDER BY ps.stage_order ASC, o.amount DESC, o.created_at DESC
+      WHERE o.company_id = @company_id AND ${scopeSql} ${whereCustomer} ${whereStatus} ${whereStage} ${whereOwner} ${whereDateFrom} ${whereDateTo} ${whereSearch}
+      ORDER BY ${orderBy}
       OFFSET @offset ROWS FETCH NEXT @page_size ROWS ONLY;
     `);
 
@@ -655,4 +672,40 @@ export async function getOpportunitiesByCustomer(companyId: number, userId: numb
       ORDER BY o.status ASC, ps.stage_order DESC, o.created_at DESC;
     `);
   return result.recordset;
+}
+
+export async function deleteOpportunity(companyId: number, userId: number, opportunityId: number) {
+  const pool = await getPool();
+
+  const existing = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("opportunity_id", sql.Int, opportunityId)
+    .query<{ customer_id: number }>(`
+      SELECT customer_id FROM crm.opportunities
+      WHERE company_id = @company_id AND opportunity_id = @opportunity_id;
+    `);
+
+  if (!existing.recordset[0]) throw new HttpError(404, "Oportunidad no encontrada");
+  await assertCustomerInScope(companyId, userId, existing.recordset[0].customer_id);
+
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+
+  try {
+    await new sql.Request(tx)
+      .input("company_id", sql.Int, companyId)
+      .input("opportunity_id", sql.Int, opportunityId)
+      .query(`DELETE FROM crm.opportunity_items WHERE company_id = @company_id AND opportunity_id = @opportunity_id;`);
+
+    await new sql.Request(tx)
+      .input("company_id", sql.Int, companyId)
+      .input("opportunity_id", sql.Int, opportunityId)
+      .query(`DELETE FROM crm.opportunities WHERE company_id = @company_id AND opportunity_id = @opportunity_id;`);
+
+    await tx.commit();
+  } catch (error) {
+    await tx.rollback();
+    throw error;
+  }
 }
