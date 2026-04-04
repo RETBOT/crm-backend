@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import { getPool, sql } from "../../db/sqlserver";
+import ExcelJS from "exceljs";
 import { abcError, abcSuccess } from "../../shared/legacy-response";
 import { PERMISSIONS } from "../auth/permissions";
 import { logger } from "../../config/logger";
@@ -207,14 +209,105 @@ export async function exportReportHandler(req: Request, res: Response): Promise<
         return;
     }
 
-    // Por ahora retornamos los datos en JSON
-    // TODO: Implementar exportación real a Excel/PDF
-    res.json({
-      resultado: 1,
-      msg: `Reporte ${input.REPORT_TYPE} generado correctamente`,
-      format: input.FORMAT,
-      data,
-    });
+    // Generar archivo real según el formato
+    if (input.FORMAT === "excel") {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(`Reporte ${input.REPORT_TYPE}`);
+
+      // Determinar columnas y datos según el tipo de reporte
+      const reportData = data?.data || data;
+      if (Array.isArray(reportData) && reportData.length > 0) {
+        // Crear headers desde las keys del primer objeto
+        const headers = Object.keys(reportData[0]).map((key) => ({
+          header: key.replace(/_/g, " ").toUpperCase(),
+          key: key,
+        }));
+        worksheet.columns = headers;
+
+        // Agregar filas
+        reportData.forEach((row: any) => {
+          worksheet.addRow(row);
+        });
+
+        // Formatear headers
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4472C4" },
+        };
+        worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+
+        // Auto-width columns
+        worksheet.columns.forEach((col) => {
+          if (col) {
+            let maxLength = 0;
+            (col as any).eachCell?.({ includeEmpty: false }, (cell: any) => {
+              const length = cell.value ? String(cell.value).length : 10;
+              if (length > maxLength) maxLength = length;
+            });
+            col.width = Math.min(Math.max(maxLength + 2, 12), 50);
+          }
+        });
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="reporte_${input.REPORT_TYPE}_${new Date().toISOString().split("T")[0]}.xlsx"`);
+      res.send(buffer);
+    } else if (input.FORMAT === "csv") {
+      const reportData = data?.data || data;
+      if (Array.isArray(reportData) && reportData.length > 0) {
+        const headers = Object.keys(reportData[0]);
+        const csvRows = [
+          headers.join(","),
+          ...reportData.map((row: any) =>
+            headers.map((h) => {
+              const val = row[h];
+              if (val === null || val === undefined) return "";
+              if (typeof val === "string" && val.includes(",")) return `"${val}"`;
+              return String(val);
+            }).join(",")
+          ),
+        ].join("\n");
+
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="reporte_${input.REPORT_TYPE}_${new Date().toISOString().split("T")[0]}.csv"`);
+      res.send("\uFEFF" + csvRows); // BOM for UTF-8
+    } else {
+      res.json({
+        resultado: 1,
+        msg: `Reporte ${input.REPORT_TYPE} generado correctamente`,
+        format: input.FORMAT,
+        data,
+      });
+    }
+
+    // Audit logging
+    try {
+      const pool = await getPool();
+      await pool
+        .request()
+        .input("company_id", sql.Int, req.auth!.companyId)
+        .input("user_id", sql.Int, req.auth!.userId)
+        .input("report_type", sql.VarChar(50), input.REPORT_TYPE)
+        .input("format", sql.VarChar(10), input.FORMAT)
+        .input("filters", sql.NVarChar(sql.MAX), JSON.stringify(filters))
+        .query(`
+          INSERT INTO crm.report_logs (company_id, user_id, report_type, format, filters, generated_at)
+          VALUES (@company_id, @user_id, @report_type, @format, @filters, SYSUTCDATETIME());
+        `);
+    } catch (logError) {
+      logger.warn({ logError }, "Failed to write audit log for report export");
+    }
+    } else {
+      res.json({
+        resultado: 1,
+        msg: `Reporte ${input.REPORT_TYPE} generado correctamente`,
+        format: input.FORMAT,
+        data,
+      });
+    }
   } catch (error: any) {
     if (error.name === "ZodError") {
       res.status(400).json({ resultado: -1, msg: "Datos inválidos", errors: error.errors });

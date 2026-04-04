@@ -42,7 +42,7 @@ export async function postProductsAbc(req: Request, res: Response): Promise<void
       return;
     }
 
-    const msg = await productsAbc(req.auth!.companyId, input);
+    const msg = await productsAbc(req.auth!.companyId, req.auth!.userId, input);
     res.json(abcSuccess(msg));
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Error en operacion de producto";

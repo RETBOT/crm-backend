@@ -592,10 +592,7 @@ export async function getSalesReport(companyId: number, userId: number, filters:
     ORDER BY period DESC, total_sales DESC;
   `);
 
-  console.log("[DEBUG getSalesReport] SQL Result rows:", result.recordset.length);
-  if (result.recordset.length > 0) {
-    console.log("[DEBUG getSalesReport] First row:", JSON.stringify(result.recordset[0]));
-  }
+  // Debug removed in production
 
   // Totales
   const totals = {
@@ -677,37 +674,14 @@ export async function getCustomersReport(
 
   // Clientes inactivos (sin compras en los últimos X días)
   const inactiveDays = 90;
-  const inactiveCustomersRes = await request.query(`
-    SELECT
-      c.customer_id,
-      c.customer_name,
-      MAX(o.close_date) AS last_purchase_date,
-      DATEDIFF(DAY, MAX(o.close_date), GETDATE()) AS days_inactive
-    FROM crm.customers c
-    LEFT JOIN crm.opportunities o ON o.company_id = c.company_id 
-      AND o.customer_id = c.customer_id
-      AND o.status = 'ganada'
-    WHERE c.company_id = @company_id
-      AND c.customer_type = 'CLIENTE'
-      AND ${scopeSql("c")}
-    GROUP BY c.customer_id, c.customer_name
-    HAVING MAX(o.close_date) IS NULL 
-      OR DATEDIFF(DAY, MAX(o.close_date), GETDATE()) > ${inactiveDays}
-    ORDER BY days_inactive DESC;
-  `);
 
-  // Resumen - corregido para evitar error de aggregate con subquery
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-  const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0];
-  
-  const summaryRes = await pool
+  const inactiveCustomersResult = await pool
     .request()
     .input("company_id", sql.Int, companyId)
     .input("scope_type", sql.VarChar(10), scope.scopeType)
     .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
     .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
-    .input("three_months_ago", sql.Date, new Date(threeMonthsAgoStr))
+    .input("inactive_days", sql.Int, inactiveDays)
     .query(`
       SELECT
         COUNT(DISTINCT CASE WHEN c.customer_type = 'CLIENTE' THEN c.customer_id END) AS total_customers,

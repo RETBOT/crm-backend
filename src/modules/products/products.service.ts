@@ -124,7 +124,7 @@ export async function getProductPriceHistory(companyId: number, productId: numbe
   return result.recordset;
 }
 
-export async function productsAbc(companyId: number, input: ProductsAbcInput): Promise<string> {
+export async function productsAbc(companyId: number, userId: number, input: ProductsAbcInput): Promise<string> {
   const pool = await getPool();
 
   if (input.TIPO === "A") {
@@ -205,9 +205,10 @@ export async function productsAbc(companyId: number, input: ProductsAbcInput): P
         .input("product_id", sql.Int, input.PRODUCT_ID)
         .input("old_price", sql.Decimal(18, 2), oldPrice)
         .input("new_price", sql.Decimal(18, 2), input.UNIT_PRICE || 0)
+        .input("changed_by_user_id", sql.Int, userId)
         .query(`
-          INSERT INTO crm.product_price_history (company_id, product_id, old_price, new_price)
-          VALUES (@company_id, @product_id, @old_price, @new_price);
+          INSERT INTO crm.product_price_history (company_id, product_id, old_price, new_price, changed_by_user_id)
+          VALUES (@company_id, @product_id, @old_price, @new_price, @changed_by_user_id);
         `);
     }
 
