@@ -7,7 +7,7 @@ CREATE TABLE crm.product_categories (
     is_active BIT DEFAULT 1,
     created_at DATETIME2 DEFAULT SYSUTCDATETIME(),
     updated_at DATETIME2 DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT FK_product_categories_company FOREIGN KEY (company_id) REFERENCES crm.companies(company_id)
+    CONSTRAINT FK_product_categories_company FOREIGN KEY (company_id) REFERENCES sec.companies(company_id)
 );
 
 -- Agregar columna category_id a productos
@@ -24,7 +24,7 @@ CREATE TABLE crm.product_price_history (
     new_price DECIMAL(18,2) NOT NULL,
     changed_by_user_id INT NULL,
     changed_at DATETIME2 DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT FK_price_history_company FOREIGN KEY (company_id) REFERENCES crm.companies(company_id),
+    CONSTRAINT FK_price_history_company FOREIGN KEY (company_id) REFERENCES sec.companies(company_id),
     CONSTRAINT FK_price_history_product FOREIGN KEY (product_id) REFERENCES crm.products(product_id)
 );
 
