@@ -719,7 +719,7 @@ export async function getCustomersReport(
         );
     `);
 
-  const summary = (summaryRes.recordset[0] as CustomerSummaryRow) || {
+  const summary = (inactiveCustomersResult.recordset[0] as CustomerSummaryRow) || {
     total_customers: 0,
     total_prospects: 0,
     active_last_3_months: 0,
@@ -737,12 +737,6 @@ export async function getCustomersReport(
       purchaseCount: Number(row.purchase_count),
       totalPurchases: Number(row.total_purchases),
       lastPurchaseDate: row.last_purchase_date,
-    })),
-    inactiveCustomers: (inactiveCustomersRes.recordset as InactiveCustomerRow[]).map((row) => ({
-      customerId: row.customer_id,
-      customerName: row.customer_name,
-      lastPurchaseDate: row.last_purchase_date,
-      daysInactive: Number(row.days_inactive),
     })),
     summary: {
       totalCustomers: Number(summary.total_customers),
