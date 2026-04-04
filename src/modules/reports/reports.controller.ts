@@ -209,70 +209,66 @@ export async function exportReportHandler(req: Request, res: Response): Promise<
         return;
     }
 
+    // Normalizar datos del reporte
+    const reportData = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+
     // Generar archivo real según el formato
-    if (input.FORMAT === "excel") {
+    if (input.FORMAT === "excel" && reportData.length > 0) {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet(`Reporte ${input.REPORT_TYPE}`);
 
-      // Determinar columnas y datos según el tipo de reporte
-      const reportData = data?.data || data;
-      if (Array.isArray(reportData) && reportData.length > 0) {
-        // Crear headers desde las keys del primer objeto
-        const headers = Object.keys(reportData[0]).map((key) => ({
-          header: key.replace(/_/g, " ").toUpperCase(),
-          key: key,
-        }));
-        worksheet.columns = headers;
+      // Crear headers desde las keys del primer objeto
+      const headers = Object.keys(reportData[0]).map((key) => ({
+        header: key.replace(/_/g, " ").toUpperCase(),
+        key: key,
+      }));
+      worksheet.columns = headers;
 
-        // Agregar filas
-        reportData.forEach((row: any) => {
-          worksheet.addRow(row);
-        });
+      // Agregar filas
+      reportData.forEach((row: any) => {
+        worksheet.addRow(row);
+      });
 
-        // Formatear headers
-        worksheet.getRow(1).font = { bold: true };
-        worksheet.getRow(1).fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FF4472C4" },
-        };
-        worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      // Formatear headers
+      worksheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" },
+      };
+      worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
 
-        // Auto-width columns
-        worksheet.columns.forEach((col) => {
-          if (col) {
-            let maxLength = 0;
-            (col as any).eachCell?.({ includeEmpty: false }, (cell: any) => {
-              const length = cell.value ? String(cell.value).length : 10;
-              if (length > maxLength) maxLength = length;
-            });
-            col.width = Math.min(Math.max(maxLength + 2, 12), 50);
-          }
-        });
-      }
+      // Auto-width columns
+      worksheet.columns.forEach((col) => {
+        if (col) {
+          let maxLength = 0;
+          (col as any).eachCell?.({ includeEmpty: false }, (cell: any) => {
+            const length = cell.value ? String(cell.value).length : 10;
+            if (length > maxLength) maxLength = length;
+          });
+          col.width = Math.min(Math.max(maxLength + 2, 12), 50);
+        }
+      });
 
       const buffer = await workbook.xlsx.writeBuffer();
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="reporte_${input.REPORT_TYPE}_${new Date().toISOString().split("T")[0]}.xlsx"`);
       res.send(buffer);
-    } else if (input.FORMAT === "csv") {
-      const reportData = data?.data || data;
-      if (Array.isArray(reportData) && reportData.length > 0) {
-        const headers = Object.keys(reportData[0]);
-        const csvRows = [
-          headers.join(","),
-          ...reportData.map((row: any) =>
-            headers.map((h) => {
-              const val = row[h];
-              if (val === null || val === undefined) return "";
-              if (typeof val === "string" && val.includes(",")) return `"${val}"`;
-              return String(val);
-            }).join(",")
-          ),
-        ].join("\n");
+    } else if (input.FORMAT === "csv" && reportData.length > 0) {
+      const headers = Object.keys(reportData[0]);
+      const csvRows = [
+        headers.join(","),
+        ...reportData.map((row: any) =>
+          headers.map((h) => {
+            const val = row[h];
+            if (val === null || val === undefined) return "";
+            if (typeof val === "string" && val.includes(",")) return `"${val}"`;
+            return String(val);
+          }).join(",")
+        ),
+      ].join("\n");
 
-        res.setHeader("Content-Type", "text/csv; charset=utf-8");
-        res.setHeader("Content-Disposition", `attachment; filename="reporte_${input.REPORT_TYPE}_${new Date().toISOString().split("T")[0]}.csv"`);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="reporte_${input.REPORT_TYPE}_${new Date().toISOString().split("T")[0]}.csv"`);
       res.send("\uFEFF" + csvRows); // BOM for UTF-8
     } else {
       res.json({
@@ -299,14 +295,6 @@ export async function exportReportHandler(req: Request, res: Response): Promise<
         `);
     } catch (logError) {
       logger.warn({ logError }, "Failed to write audit log for report export");
-    }
-    } else {
-      res.json({
-        resultado: 1,
-        msg: `Reporte ${input.REPORT_TYPE} generado correctamente`,
-        format: input.FORMAT,
-        data,
-      });
     }
   } catch (error: any) {
     if (error.name === "ZodError") {

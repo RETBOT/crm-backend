@@ -17,6 +17,7 @@ import { opportunitiesRoutes } from "./modules/opportunities/opportunities.route
 import { productsRoutes } from "./modules/products/products.routes";
 import { notificationsRoutes } from "./modules/notifications/notifications.routes";
 import { reportsRoutes } from "./modules/reports/reports.routes";
+import { startReportScheduler } from "./modules/reports/reports.scheduler";
 import { errorHandler } from "./middlewares/error-handler";
 import { notFoundHandler } from "./middlewares/not-found";
 
@@ -58,6 +59,9 @@ export function createApp() {
 
   app.use(notFoundHandler);
   app.use(errorHandler);
+
+  // Start report scheduler
+  startReportScheduler();
 
   return app;
 }
