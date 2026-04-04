@@ -16,19 +16,21 @@ export const opportunityCreateSchema = z.object({
   TITLE: z.string().min(1, "Titulo es requerido"),
   DESCRIPTION: z.string().optional().default(""),
   AMOUNT: z.coerce.number().optional().default(0),
-  CLOSE_DATE: z.string().optional().nullable(),
-  PROBABILITY: z.coerce.number().optional().default(0),
+  CLOSE_DATE: z.string().optional().nullable().refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), { message: "Fecha invalida, usa YYYY-MM-DD" }),
+  PROBABILITY: z.coerce.number().min(0, "Probabilidad minima 0").max(100, "Probabilidad maxima 100").optional().default(0),
 });
 
 export const opportunityUpdateSchema = z.object({
   OPPORTUNITY_ID: z.coerce.number(),
   CUSTOMER_ID: z.coerce.number().optional().nullable(),
+  PIPELINE_ID: z.coerce.number().optional().nullable(),
+  STAGE_ID: z.coerce.number().optional().nullable(),
   CONTACT_ID: z.coerce.number().optional().nullable(),
   TITLE: z.string().min(1, "Titulo es requerido"),
   DESCRIPTION: z.string().optional().default(""),
   AMOUNT: z.coerce.number().optional().default(0),
-  CLOSE_DATE: z.string().optional().nullable(),
-  PROBABILITY: z.coerce.number().optional().default(0),
+  CLOSE_DATE: z.string().optional().nullable().refine((v) => !v || /^\d{4}-\d{2}-\d{2}$/.test(v), { message: "Fecha invalida, usa YYYY-MM-DD" }),
+  PROBABILITY: z.coerce.number().min(0, "Probabilidad minima 0").max(100, "Probabilidad maxima 100").optional().default(0),
 });
 
 export const opportunityAdvanceSchema = z.object({

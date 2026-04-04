@@ -145,8 +145,22 @@ export async function listOpportunities(companyId: number, userId: number, input
   return { data: dataResult.recordset, tot_pags: totalPages, total_regs: total };
 }
 
-export async function getOpportunityItems(companyId: number, opportunityId: number) {
+export async function getOpportunityItems(companyId: number, userId: number, opportunityId: number) {
   const pool = await getPool();
+
+  // Verify user has access to this opportunity's customer
+  const oppCheck = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("opportunity_id", sql.Int, opportunityId)
+    .query<{ customer_id: number }>(`
+      SELECT customer_id FROM crm.opportunities
+      WHERE company_id = @company_id AND opportunity_id = @opportunity_id;
+    `);
+
+  if (!oppCheck.recordset[0]) throw new HttpError(404, "Oportunidad no encontrada");
+  await assertCustomerInScope(companyId, userId, oppCheck.recordset[0].customer_id);
+
   const result = await pool
     .request()
     .input("company_id", sql.Int, companyId)
@@ -238,8 +252,8 @@ export async function updateOpportunity(companyId: number, userId: number, input
     .request()
     .input("company_id", sql.Int, companyId)
     .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
-    .query<{ customer_id: number; status: string }>(`
-      SELECT customer_id, status FROM crm.opportunities
+    .query<{ customer_id: number; status: string; pipeline_id: number }>(`
+      SELECT customer_id, status, pipeline_id FROM crm.opportunities
       WHERE company_id = @company_id AND opportunity_id = @opportunity_id;
     `);
 
@@ -248,46 +262,125 @@ export async function updateOpportunity(companyId: number, userId: number, input
 
   await assertCustomerInScope(companyId, userId, existing.recordset[0].customer_id);
 
-  await pool
-    .request()
-    .input("company_id", sql.Int, companyId)
-    .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
-    .input("contact_id", sql.Int, input.CONTACT_ID ?? null)
-    .input("title", sql.NVarChar(180), input.TITLE)
-    .input("description", sql.NVarChar(1000), input.DESCRIPTION || "")
-    .input("amount", sql.Decimal(18, 2), input.AMOUNT || 0)
-    .input("close_date", sql.Date, input.CLOSE_DATE ? new Date(input.CLOSE_DATE) : null)
-    .input("probability_pct", sql.Decimal(5, 2), input.PROBABILITY || 0)
-    .query(`
-      UPDATE crm.opportunities SET
-        contact_id = @contact_id, title = @title, description = @description,
-        amount = @amount, close_date = @close_date, probability_pct = @probability_pct,
-        updated_at = SYSUTCDATETIME()
-      WHERE company_id = @company_id AND opportunity_id = @opportunity_id;
-    `);
+  // Validate pipeline/stage if changing
+  let targetPipelineId = input.PIPELINE_ID ?? existing.recordset[0].pipeline_id;
+  let targetStageId = input.STAGE_ID;
 
-  if (items.length > 0) {
-    await pool
-      .request()
-      .input("company_id", sql.Int, companyId)
-      .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
-      .query(`DELETE FROM crm.opportunity_items WHERE company_id = @company_id AND opportunity_id = @opportunity_id;`);
-
-    for (const item of items) {
-      await pool
+  if (input.PIPELINE_ID || input.STAGE_ID) {
+    if (input.STAGE_ID) {
+      const stageCheck = await pool
         .request()
         .input("company_id", sql.Int, companyId)
-        .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
-        .input("product_id", sql.Int, item.PRODUCT_ID ?? null)
-        .input("item_description", sql.NVarChar(200), item.ITEM_DESCRIPTION || "")
-        .input("quantity", sql.Decimal(12, 2), item.QUANTITY || 1)
-        .input("unit_price", sql.Decimal(18, 2), item.UNIT_PRICE || 0)
-        .input("discount_pct", sql.Decimal(5, 2), item.DISCOUNT_PCT || 0)
-        .query(`
-          INSERT INTO crm.opportunity_items (company_id, opportunity_id, product_id, item_description, quantity, unit_price, discount_pct)
-          VALUES (@company_id, @opportunity_id, @product_id, @item_description, @quantity, @unit_price, @discount_pct);
+        .input("stage_id", sql.Int, input.STAGE_ID)
+        .input("pipeline_id", sql.Int, targetPipelineId)
+        .query<{ stage_id: number; pipeline_id: number; is_closed: boolean }>(`
+          SELECT stage_id, pipeline_id, is_closed FROM crm.pipeline_stages
+          WHERE company_id = @company_id AND stage_id = @stage_id;
         `);
+
+      if (!stageCheck.recordset[0]) throw new HttpError(404, "Etapa no encontrada");
+      if (stageCheck.recordset[0].pipeline_id !== targetPipelineId) {
+        throw new HttpError(400, "La etapa no pertenece al pipeline seleccionado");
+      }
+      if (stageCheck.recordset[0].is_closed) {
+        throw new HttpError(400, "No se puede mover a una etapa cerrada");
+      }
+      targetStageId = stageCheck.recordset[0].stage_id;
     }
+  }
+
+  const tx = new sql.Transaction(pool);
+  await tx.begin();
+
+  try {
+    await new sql.Request(tx)
+      .input("company_id", sql.Int, companyId)
+      .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
+      .input("contact_id", sql.Int, input.CONTACT_ID ?? null)
+      .input("title", sql.NVarChar(180), input.TITLE)
+      .input("description", sql.NVarChar(1000), input.DESCRIPTION || "")
+      .input("amount", sql.Decimal(18, 2), input.AMOUNT || 0)
+      .input("close_date", sql.Date, input.CLOSE_DATE ? new Date(input.CLOSE_DATE) : null)
+      .input("probability_pct", sql.Decimal(5, 2), input.PROBABILITY || 0)
+      .input("pipeline_id", sql.Int, targetPipelineId)
+      .input("stage_id", sql.Int, targetStageId ?? existing.recordset[0].stage_id)
+      .input("customer_id", sql.Int, input.CUSTOMER_ID ?? null)
+      .query(`
+        UPDATE crm.opportunities SET
+          contact_id = @contact_id, title = @title, description = @description,
+          amount = @amount, close_date = @close_date, probability_pct = @probability_pct,
+          pipeline_id = @pipeline_id, stage_id = @stage_id,
+          updated_at = SYSUTCDATETIME()
+        WHERE company_id = @company_id AND opportunity_id = @opportunity_id;
+      `);
+
+    // Differential item update: only if items array is provided
+    if (items.length > 0) {
+      // Get existing items
+      const existingItemsResult = await new sql.Request(tx)
+        .input("company_id", sql.Int, companyId)
+        .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
+        .query<{ opportunity_item_id: number; product_id: number }>(`
+          SELECT opportunity_item_id, product_id FROM crm.opportunity_items
+          WHERE company_id = @company_id AND opportunity_id = @opportunity_id;
+        `);
+
+      const existingItemIds = new Set(existingItemsResult.recordset.map((r) => r.opportunity_item_id));
+      const incomingProductIds = new Set(items.filter((i) => i.PRODUCT_ID).map((i) => i.PRODUCT_ID!));
+
+      // Delete items that are no longer in the incoming list
+      for (const existingItem of existingItemsResult.recordset) {
+        if (existingItem.product_id && !incomingProductIds.has(existingItem.product_id)) {
+          await new sql.Request(tx)
+            .input("company_id", sql.Int, companyId)
+            .input("opportunity_item_id", sql.Int, existingItem.opportunity_item_id)
+            .query(`DELETE FROM crm.opportunity_items WHERE company_id = @company_id AND opportunity_item_id = @opportunity_item_id;`);
+        }
+      }
+
+      // Insert or update incoming items
+      for (const item of items) {
+        if (item.PRODUCT_ID) {
+          const existingItem = existingItemsResult.recordset.find((r) => r.product_id === item.PRODUCT_ID);
+          if (existingItem) {
+            // Update existing
+            await new sql.Request(tx)
+              .input("company_id", sql.Int, companyId)
+              .input("opportunity_item_id", sql.Int, existingItem.opportunity_item_id)
+              .input("product_id", sql.Int, item.PRODUCT_ID)
+              .input("item_description", sql.NVarChar(200), item.ITEM_DESCRIPTION || "")
+              .input("quantity", sql.Decimal(12, 2), item.QUANTITY || 1)
+              .input("unit_price", sql.Decimal(18, 2), item.UNIT_PRICE || 0)
+              .input("discount_pct", sql.Decimal(5, 2), item.DISCOUNT_PCT || 0)
+              .query(`
+                UPDATE crm.opportunity_items SET
+                  product_id = @product_id, item_description = @item_description,
+                  quantity = @quantity, unit_price = @unit_price, discount_pct = @discount_pct
+                WHERE company_id = @company_id AND opportunity_item_id = @opportunity_item_id;
+              `);
+          } else {
+            // Insert new
+            await new sql.Request(tx)
+              .input("company_id", sql.Int, companyId)
+              .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
+              .input("product_id", sql.Int, item.PRODUCT_ID)
+              .input("item_description", sql.NVarChar(200), item.ITEM_DESCRIPTION || "")
+              .input("quantity", sql.Decimal(12, 2), item.QUANTITY || 1)
+              .input("unit_price", sql.Decimal(18, 2), item.UNIT_PRICE || 0)
+              .input("discount_pct", sql.Decimal(5, 2), item.DISCOUNT_PCT || 0)
+              .query(`
+                INSERT INTO crm.opportunity_items (company_id, opportunity_id, product_id, item_description, quantity, unit_price, discount_pct)
+                VALUES (@company_id, @opportunity_id, @product_id, @item_description, @quantity, @unit_price, @discount_pct);
+              `);
+          }
+        }
+      }
+    }
+
+    await tx.commit();
+  } catch (error) {
+    await tx.rollback();
+    throw error;
   }
 }
 
@@ -298,8 +391,8 @@ export async function advanceOpportunityStage(companyId: number, userId: number,
     .request()
     .input("company_id", sql.Int, companyId)
     .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
-    .query<{ customer_id: number; status: string }>(`
-      SELECT customer_id, status FROM crm.opportunities
+    .query<{ customer_id: number; status: string; pipeline_id: number }>(`
+      SELECT customer_id, status, pipeline_id FROM crm.opportunities
       WHERE company_id = @company_id AND opportunity_id = @opportunity_id;
     `);
 
@@ -311,12 +404,19 @@ export async function advanceOpportunityStage(companyId: number, userId: number,
     .request()
     .input("company_id", sql.Int, companyId)
     .input("stage_id", sql.Int, input.STAGE_ID)
-    .query<{ stage_id: number; probability: number; is_closed: boolean; is_won: boolean }>(`
-      SELECT stage_id, default_probability_pct AS probability, is_closed, is_won
+    .input("pipeline_id", sql.Int, existing.recordset[0].pipeline_id)
+    .query<{ stage_id: number; probability: number; is_closed: boolean; is_won: boolean; pipeline_id: number }>(`
+      SELECT stage_id, default_probability_pct AS probability, is_closed, is_won, pipeline_id
       FROM crm.pipeline_stages WHERE company_id = @company_id AND stage_id = @stage_id;
     `);
 
   if (!stage.recordset[0]) throw new HttpError(400, "Etapa no encontrada");
+  if (stage.recordset[0].pipeline_id !== existing.recordset[0].pipeline_id) {
+    throw new HttpError(400, "La etapa no pertenece al pipeline de esta oportunidad");
+  }
+  if (stage.recordset[0].is_closed) {
+    throw new HttpError(400, "No se puede mover a una etapa cerrada");
+  }
 
   await pool
     .request()
@@ -372,7 +472,7 @@ export async function setOpportunityStatus(companyId: number, userId: number, in
     `);
 }
 
-export async function reopenOpportunity(companyId: number, userId: number, input: any) {
+export async function reopenOpportunity(companyId: number, userId: number, input: { OPPORTUNITY_ID: number }) {
   const pool = await getPool();
 
   const existing = await pool
@@ -447,10 +547,25 @@ async function getProductPrice(companyId: number, productId: number): Promise<nu
   return result.recordset[0].unit_price;
 }
 
-export async function createOpportunityItem(companyId: number, opportunityId: number, input: OpportunityItemInput) {
+async function assertOpportunityInScope(companyId: number, userId: number, opportunityId: number): Promise<void> {
+  const pool = await getPool();
+  const oppCheck = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("opportunity_id", sql.Int, opportunityId)
+    .query<{ customer_id: number }>(`
+      SELECT customer_id FROM crm.opportunities
+      WHERE company_id = @company_id AND opportunity_id = @opportunity_id;
+    `);
+
+  if (!oppCheck.recordset[0]) throw new HttpError(404, "Oportunidad no encontrada");
+  await assertCustomerInScope(companyId, userId, oppCheck.recordset[0].customer_id);
+}
+
+export async function createOpportunityItem(companyId: number, userId: number, opportunityId: number, input: OpportunityItemInput) {
+  await assertOpportunityInScope(companyId, userId, opportunityId);
   const pool = await getPool();
   
-  // Si se proporcionó un product_id, obtener el precio real desde BD
   let unitPrice = input.UNIT_PRICE || 0;
   if (input.PRODUCT_ID) {
     unitPrice = await getProductPrice(companyId, input.PRODUCT_ID);
@@ -474,10 +589,10 @@ export async function createOpportunityItem(companyId: number, opportunityId: nu
   return result.recordset[0].opportunity_item_id;
 }
 
-export async function updateOpportunityItem(companyId: number, opportunityId: number, itemId: number, input: OpportunityItemInput) {
+export async function updateOpportunityItem(companyId: number, userId: number, opportunityId: number, itemId: number, input: OpportunityItemInput) {
+  await assertOpportunityInScope(companyId, userId, opportunityId);
   const pool = await getPool();
   
-  // Siempre obtener el precio real desde BD (nunca permitir edición directa de precio)
   let unitPrice = 0;
   if (input.PRODUCT_ID) {
     unitPrice = await getProductPrice(companyId, input.PRODUCT_ID);
@@ -506,7 +621,8 @@ export async function updateOpportunityItem(companyId: number, opportunityId: nu
     `);
 }
 
-export async function deleteOpportunityItem(companyId: number, opportunityId: number, itemId: number) {
+export async function deleteOpportunityItem(companyId: number, userId: number, opportunityId: number, itemId: number) {
+  await assertOpportunityInScope(companyId, userId, opportunityId);
   const pool = await getPool();
   
   await pool

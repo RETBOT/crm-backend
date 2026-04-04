@@ -8,6 +8,7 @@ import {
   opportunityItemSchema,
   opportunityStatusSchema,
   opportunityUpdateSchema,
+  opportunityReopenSchema,
 } from "./opportunities.schemas";
 import {
   advanceOpportunityStage,
@@ -36,7 +37,7 @@ export async function getOpportunities(req: Request, res: Response): Promise<voi
 
 export async function getOpportunityItemsHandler(req: Request, res: Response): Promise<void> {
   const oppId = Number(req.params.id);
-  const data = await getOpportunityItems(req.auth!.companyId, oppId);
+  const data = await getOpportunityItems(req.auth!.companyId, req.auth!.userId, oppId);
   res.json(data);
 }
 
@@ -101,7 +102,8 @@ export async function postReopen(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  await reopenOpportunity(req.auth!.companyId, req.auth!.userId, req.body ?? {});
+  const input = opportunityReopenSchema.parse(req.body ?? {});
+  await reopenOpportunity(req.auth!.companyId, req.auth!.userId, input);
   res.json(abcSuccess("Oportunidad reabierta correctamente"));
 }
 
@@ -119,7 +121,7 @@ export async function postCreateOpportunityItem(req: Request, res: Response): Pr
   const oppId = Number(req.params.opportunityId);
   const body = req.body ?? {};
   const input = opportunityItemSchema.parse(body);
-  const id = await createOpportunityItem(req.auth!.companyId, oppId, input);
+  const id = await createOpportunityItem(req.auth!.companyId, req.auth!.userId, oppId, input);
   res.json({ resultado: 1, msg: "Ítem creado correctamente", opportunity_item_id: id });
 }
 
@@ -133,7 +135,7 @@ export async function postUpdateOpportunityItem(req: Request, res: Response): Pr
   const itemId = Number(req.params.itemId);
   const body = req.body ?? {};
   const input = opportunityItemSchema.parse(body);
-  await updateOpportunityItem(req.auth!.companyId, oppId, itemId, input);
+  await updateOpportunityItem(req.auth!.companyId, req.auth!.userId, oppId, itemId, input);
   res.json(abcSuccess("Ítem actualizado correctamente"));
 }
 
@@ -145,6 +147,6 @@ export async function postDeleteOpportunityItem(req: Request, res: Response): Pr
 
   const oppId = Number(req.params.opportunityId);
   const itemId = Number(req.params.itemId);
-  await deleteOpportunityItem(req.auth!.companyId, oppId, itemId);
+  await deleteOpportunityItem(req.auth!.companyId, req.auth!.userId, oppId, itemId);
   res.json(abcSuccess("Ítem eliminado correctamente"));
 }
