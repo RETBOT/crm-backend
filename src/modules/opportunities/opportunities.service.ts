@@ -269,8 +269,8 @@ export async function updateOpportunity(companyId: number, userId: number, input
     .request()
     .input("company_id", sql.Int, companyId)
     .input("opportunity_id", sql.Int, input.OPPORTUNITY_ID)
-    .query<{ customer_id: number; status: string; pipeline_id: number }>(`
-      SELECT customer_id, status, pipeline_id FROM crm.opportunities
+    .query<{ customer_id: number; status: string; pipeline_id: number; stage_id: number }>(`
+      SELECT customer_id, status, pipeline_id, stage_id FROM crm.opportunities
       WHERE company_id = @company_id AND opportunity_id = @opportunity_id;
     `);
 

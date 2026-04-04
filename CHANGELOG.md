@@ -29,6 +29,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ### Fixed
 - Bug crítico en `listContacts`: detectaba si CLIENTEID era numérico y buscaba por PK en vez de customer_code → "No tiene acceso a este cliente/prospecto"
 - Bug en `getActivityUsersHandler`: parámetro `_req` no se podía usar como `req` → error 400
+- Bug en `updateOpportunity`: SELECT no incluía `stage_id` → NULL en UPDATE → "Cannot insert NULL into column stage_id"
+- Bug en `updateOpportunity`: items se borraban y re-insertaban sin transacción → pérdida de datos
+- Bug en `advanceOpportunityStage`: permitía mover a etapa de otro pipeline
+- Bug en `advanceOpportunityStage`: permitía mover a etapa cerrada
+- Bug en `reopenOpportunity`: usaba `any` como input sin validación
+- Bug en items CRUD: sin scope check → cualquier usuario podía editar items de cualquier oportunidad
+- Bug en `getOpportunityItems`: sin scope check → cualquier usuario veía items de cualquier oportunidad
 
 ---
 
