@@ -7,35 +7,52 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Modulo completo de reportes con 6 tipos: Dashboard, Ventas, Clientes, Actividades, Oportunidades, Productos
+- Exportacion a Excel (multi-hoja con exceljs), PDF (multi-seccion con pdfkit) y CSV
+- Vistas guardadas: CRUD completo para guardar/cargar configuraciones de filtros
+- Reportes programados: API completa para programar envios automaticos por email
+- Scheduler de reportes con node-cron: ejecuta reportes y envia por email automaticamente
+- Audit logging de exportaciones en `crm.report_logs`
+- Tablas `crm.report_saved_views` y `crm.report_scheduled` para vistas y programaciones
 - Endpoint `POST /cn/actividades_checkins` - listar check-ins de actividades completadas con filtros de fecha, tipo y usuario
 - Columnas `check_in_lat` y `check_in_lon` en `crm.activities` para coordenadas GPS del check-in
-- Notas obligatorias al completar Visita/Reunion (mínimo 10 caracteres)
-- SQL migration `add_activity_checkin.sql` - columnas de check-in con constraints e índice
+- Notas obligatorias al completar Visita/Reunion (minimo 10 caracteres)
+- SQL migration `add_activity_checkin.sql` - columnas de check-in con constraints e indice
 - SQL migration `add_sucursalid_to_view.sql` - agrega SUCURSALID a vista vw_cn_clientes
+- SQL migration `add_report_permissions.sql` - permisos de reportes (view, export, scheduled, saved_views)
 - `activityCheckinsListSchema` con filtro TYPE opcional
 - `getActivityCheckins()` en service: query con scope, filtros de fecha/tipo/usuario
 - Filtros avanzados en actividades: prioridad, responsable, rango de fechas
-- Ordenamiento dinámico en actividades por fecha, prioridad, estado, fecha de creación
+- Ordenamiento dinamico en actividades por fecha, prioridad, estado, fecha de creacion
+- Permisos de reportes: `reports.view`, `reports.export`, `reports.scheduled`, `reports.saved_views`
+- Filtros avanzados en reportes: sucursal, vendedor, producto, etapa, estatus, rango de montos
 
 ### Changed
-- `completeActivity` ahora acepta `NOTES` como parámetro y las append al campo existente con separador `--- Check-in ---`
+- `completeActivity` ahora acepta `NOTES` como parametro y las append al campo existente con separador `--- Check-in ---`
 - `getActivityCheckins` ahora devuelve `a.notes AS NOTES` en el SELECT
-- `listCustomers`: filtro de sucursal usa `SUCURSALID` en vez de `SUCURSAL` (comparación por ID)
-- `listContacts`: siempre busca por `customer_code` (eliminado bug de detección numérica que confundía PK con código)
+- `listCustomers`: filtro de sucursal usa `SUCURSALID` en vez de `SUCURSAL` (comparacion por ID)
+- `listContacts`: siempre busca por `customer_code` (eliminado bug de deteccion numerica que confundia PK con codigo)
 - `getActivityUsersHandler`: corregido `_req` → `req` (error "req is not defined")
 - `activitiesListSchema`: agregados campos PRIORITY, OWNER_USER_ID, DUE_FROM, DUE_TO, SORT_BY, SORT_DIR
-- `listActivities`: agregados filtros por prioridad, responsable, rango de fechas y ordenamiento dinámico
+- `listActivities`: agregados filtros por prioridad, responsable, rango de fechas y ordenamiento dinamico
+- `updateOpportunity`: ahora incluye `stage_id` en el SELECT para evitar NULL en UPDATE
+- `updateOpportunity`: usa transaccion para items (diff insert/update/delete en vez de borrar todo)
 
 ### Fixed
-- Bug crítico en `listContacts`: detectaba si CLIENTEID era numérico y buscaba por PK en vez de customer_code → "No tiene acceso a este cliente/prospecto"
-- Bug en `getActivityUsersHandler`: parámetro `_req` no se podía usar como `req` → error 400
-- Bug en `updateOpportunity`: SELECT no incluía `stage_id` → NULL en UPDATE → "Cannot insert NULL into column stage_id"
-- Bug en `updateOpportunity`: items se borraban y re-insertaban sin transacción → pérdida de datos
-- Bug en `advanceOpportunityStage`: permitía mover a etapa de otro pipeline
-- Bug en `advanceOpportunityStage`: permitía mover a etapa cerrada
-- Bug en `reopenOpportunity`: usaba `any` como input sin validación
-- Bug en items CRUD: sin scope check → cualquier usuario podía editar items de cualquier oportunidad
-- Bug en `getOpportunityItems`: sin scope check → cualquier usuario veía items de cualquier oportunidad
+- Bug critico en `listContacts`: detectaba si CLIENTEID era numerico y buscaba por PK en vez de customer_code → "No tiene acceso a este cliente/prospecto"
+- Bug en `getActivityUsersHandler`: parametro `_req` no se podia usar como `req` → error 400
+- Bug en `updateOpportunity`: SELECT no incluia `stage_id` → NULL en UPDATE → "Cannot insert NULL into column stage_id"
+- Bug en `updateOpportunity`: items se borraban y re-insertaban sin transaccion → perdida de datos
+- Bug en `advanceOpportunityStage`: permitia mover a etapa de otro pipeline
+- Bug en `advanceOpportunityStage`: permitia mover a etapa cerrada
+- Bug en `reopenOpportunity`: usaba `any` como input sin validacion
+- Bug en items CRUD: sin scope check → cualquier usuario podia editar items de cualquier oportunidad
+- Bug en `getOpportunityItems`: sin scope check → cualquier usuario veia items de cualquier oportunidad
+- Bug en `getCustomersReport`: variable `summaryRes` no existia → crash
+- Bug en `getCustomersReport`: `@three_months_ago` no declarado como parametro SQL
+- Bug en `getCustomersReport`: `IN ()` vacio cuando branch_ids_csv estaba vacio → syntax error
+- Bug en exportacion PDF: `bufferedPageRange()` no existe en pdfkit → error 500
+- Bug en scheduler: `scheduled_id` → nombre correcto es `schedule_id`
 
 ---
 

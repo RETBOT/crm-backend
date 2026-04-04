@@ -111,13 +111,21 @@ src/
 ### Reportes
 | Método | Ruta | Permiso | Descripción |
 |--------|------|---------|-------------|
-| GET | `/api/reports/activities` | reports.view | Reporte de actividades |
-| GET | `/api/reports/customers` | reports.view | Reporte de clientes |
-| GET | `/api/reports/opportunities` | reports.view | Reporte de oportunidades |
-| GET | `/api/reports/products` | reports.view | Reporte de productos |
-| GET | `/api/reports/sales` | reports.view | Reporte de ventas |
-| GET | `/api/reports/dashboard` | reports.view | Reporte del dashboard |
-| POST | `/api/reports/export` | reports.export | Exportar reporte (CSV/Excel) |
+| POST | `/api/reports/dashboard` | reports.view | Reporte del dashboard ejecutivo |
+| POST | `/api/reports/sales` | reports.view | Reporte de ventas |
+| POST | `/api/reports/customers` | reports.view | Reporte de clientes |
+| POST | `/api/reports/activities` | reports.view | Reporte de actividades |
+| POST | `/api/reports/opportunities` | reports.view | Reporte de oportunidades |
+| POST | `/api/reports/products` | reports.view | Reporte de productos |
+| POST | `/api/reports/export` | reports.export | Exportar reporte (Excel/PDF/CSV) |
+| GET | `/api/reports/saved-views` | reports.saved_views | Listar vistas guardadas |
+| POST | `/api/reports/saved-views` | reports.saved_views | Crear vista guardada |
+| PUT | `/api/reports/saved-views/:id` | reports.saved_views | Actualizar vista guardada |
+| DELETE | `/api/reports/saved-views/:id` | reports.saved_views | Eliminar vista guardada |
+| GET | `/api/reports/scheduled` | reports.scheduled | Listar reportes programados |
+| POST | `/api/reports/scheduled` | reports.scheduled | Crear reporte programado |
+| PUT | `/api/reports/scheduled/:id` | reports.scheduled | Actualizar reporte programado |
+| DELETE | `/api/reports/scheduled/:id` | reports.scheduled | Eliminar reporte programado |
 
 ### Notificaciones
 | Método | Ruta | Permiso | Descripción |
@@ -227,9 +235,11 @@ Archivos disponibles en `sql/`:
 | `add_assign_permission.sql` | Permiso de asignación de actividades |
 | `add_activity_checkin.sql` | Columnas de check-in GPS en actividades |
 | `add_sucursalid_to_view.sql` | Agrega SUCURSALID a la vista vw_cn_clientes |
+| `add_report_permissions.sql` | Permisos de reportes (view, export, scheduled, saved_views) |
 | `add_notifications_table.sql` | Tabla de notificaciones |
 | `add_products_updatedAt.sql` | Columna updatedAt en productos |
-| `create_report_tables.sql` | Tablas de reportes |
+| `add_product_categories.sql` | Categorías de productos + historial de precios |
+| `create_report_tables.sql` | Tablas de reportes, vistas guardadas, programaciones |
 | `create_user_scope_tables.sql` | Tablas de alcance de datos |
 | `fix_admin_reports_permission.sql` | Corrige permiso de reportes para admin |
 | `Creacion y ejemplos.sql` | Creación de base de datos y datos de ejemplo |
@@ -273,6 +283,34 @@ Flujo completo implementado:
 6. Ingresa nueva contraseña → backend valida token y actualiza `password_hash`
 7. Token se marca como usado
 
+## Reportes
+
+El sistema incluye un módulo completo de reportes con:
+
+### Tipos de Reporte
+- **Dashboard**: KPIs ejecutivos, tendencias de ventas, oportunidades por estatus, actividades por estatus, top vendedores
+- **Ventas**: Ventas por período y vendedor, totales, probabilidad promedio
+- **Clientes**: Clientes nuevos por período, clientes recurrentes, resumen de actividad
+- **Actividades**: Por estatus, por tipo, tendencia diaria, por vendedor
+- **Oportunidades**: Por estatus, por vendedor, pipeline activo, tasa de éxito
+- **Productos**: Por categoría, stock, precios
+
+### Exportación
+- **Excel**: Multi-hoja con formato (headers azules, filas alternadas, auto-width, freeze header)
+- **PDF**: Multi-sección con resumen, KPIs, gráficos como tablas, datos detallados
+- **CSV**: UTF-8 con BOM para compatibilidad con Excel
+
+### Vistas Guardadas
+- Guarda configuraciones de filtros con nombre
+- Carga rápidamente vistas previamente guardadas
+- Elimina vistas que ya no necesitas
+
+### Reportes Programados
+- Programa envío automático de reportes por email
+- Frecuencias: diaria, semanal, mensual
+- Configuración de destinatarios múltiples
+- Toggle para activar/desactivar sin eliminar
+
 ## Notas
 
 - **RETEX** = estructura y control · **RETFlow** = ejecución y movimiento
@@ -285,3 +323,5 @@ Flujo completo implementado:
 - **Check-in GPS**: al completar Visita/Reunion se requiere nota mínima de 10 caracteres. Las notas se append al campo existente con separador `--- Check-in ---`
 - **Vista vw_cn_clientes**: incluye `SUCURSALID` para filtrado correcto por ID de sucursal
 - **Precisión GPS**: se acepta cualquier precisión pero se advierte visualmente al usuario (>150m = advertencia ámbar)
+- **Reportes**: exportación a Excel (multi-hoja), PDF (multi-sección) y CSV. Vistas guardadas y reportes programados con envío por email automático via node-cron
+- **Scheduler**: se inicia automáticamente al arrancar la app. Revisa `crm.report_scheduled` cada minuto y envía reportes por email
