@@ -93,6 +93,10 @@ export async function listActivities(companyId: number, userId: number, input: A
     : input.STATUS ? "AND a.status = @status" : "";
   const whereType = input.TYPE ? "AND a.activity_type_code = @type" : "";
   const whereSearch = input.SEARCH ? "AND (a.subject LIKE @search OR a.notes LIKE @search)" : "";
+  const wherePriority = input.PRIORITY ? "AND a.priority_code = @priority" : "";
+  const whereOwner = input.OWNER_USER_ID ? "AND a.owner_user_id = @owner_id" : "";
+  const whereDueFrom = input.DUE_FROM ? "AND a.due_at >= @due_from" : "";
+  const whereDueTo = input.DUE_TO ? "AND a.due_at <= @due_to" : "";
 
   const scopeSql = buildScopeConditionSql("a");
 
@@ -106,6 +110,10 @@ export async function listActivities(companyId: number, userId: number, input: A
     .input("status", sql.VarChar(20), input.STATUS || "")
     .input("type", sql.VarChar(20), input.TYPE || "")
     .input("search", sql.NVarChar(200), input.SEARCH ? `%${input.SEARCH}%` : "")
+    .input("priority", sql.VarChar(20), input.PRIORITY || "")
+    .input("owner_id", sql.Int, input.OWNER_USER_ID ?? null)
+    .input("due_from", sql.DateTime2, input.DUE_FROM && input.DUE_FROM.trim() ? new Date(input.DUE_FROM + "T00:00:00") : null)
+    .input("due_to", sql.DateTime2, input.DUE_TO && input.DUE_TO.trim() ? new Date(input.DUE_TO + "T23:59:59") : null)
     .query<{ total: number }>(`
       SELECT COUNT(1) AS total
       FROM crm.activities a
@@ -114,11 +122,30 @@ export async function listActivities(companyId: number, userId: number, input: A
         ${whereCustomer}
         ${whereStatus}
         ${whereType}
-        ${whereSearch};
+        ${whereSearch}
+        ${wherePriority}
+        ${whereOwner}
+        ${whereDueFrom}
+        ${whereDueTo};
     `);
 
   const total = countResult.recordset[0]?.total ?? 0;
   const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+
+  const sortBy = input.SORT_BY || "status";
+  const sortDir = input.SORT_DIR || "ASC";
+
+  const orderBy = `
+    ORDER BY
+      CASE @sort_by
+        WHEN 'due_at' THEN CONVERT(varchar(20), a.due_at, 120)
+        WHEN 'priority' THEN CASE a.priority_code WHEN 'Alta' THEN '1' WHEN 'Media' THEN '2' WHEN 'Baja' THEN '3' ELSE '4' END
+        WHEN 'status' THEN CASE a.status WHEN 'Pendiente' THEN '1' WHEN 'Programada' THEN '2' WHEN 'Completada' THEN '3' WHEN 'Cancelada' THEN '4' ELSE '5' END
+        WHEN 'created_at' THEN CONVERT(varchar(20), a.created_at, 120)
+        ELSE CASE a.status WHEN 'Pendiente' THEN '1' WHEN 'Programada' THEN '2' WHEN 'Completada' THEN '3' WHEN 'Cancelada' THEN '4' ELSE '5' END
+      END ${sortDir === "DESC" ? "DESC" : "ASC"},
+      a.created_at DESC
+  `;
 
   const dataResult = await pool
     .request()
@@ -130,6 +157,12 @@ export async function listActivities(companyId: number, userId: number, input: A
     .input("status", sql.VarChar(20), input.STATUS || "")
     .input("type", sql.VarChar(20), input.TYPE || "")
     .input("search", sql.NVarChar(200), input.SEARCH ? `%${input.SEARCH}%` : "")
+    .input("priority", sql.VarChar(20), input.PRIORITY || "")
+    .input("owner_id", sql.Int, input.OWNER_USER_ID ?? null)
+    .input("due_from", sql.DateTime2, input.DUE_FROM && input.DUE_FROM.trim() ? new Date(input.DUE_FROM + "T00:00:00") : null)
+    .input("due_to", sql.DateTime2, input.DUE_TO && input.DUE_TO.trim() ? new Date(input.DUE_TO + "T23:59:59") : null)
+    .input("sort_by", sql.VarChar(20), sortBy)
+    .input("sort_dir", sql.VarChar(4), sortDir)
     .input("offset", sql.Int, offset)
     .input("page_size", sql.Int, pageSize)
     .query(`
@@ -164,10 +197,11 @@ export async function listActivities(companyId: number, userId: number, input: A
         ${whereStatus}
         ${whereType}
         ${whereSearch}
-      ORDER BY
-        CASE a.status WHEN 'Pendiente' THEN 1 WHEN 'Programada' THEN 2 WHEN 'Completada' THEN 3 WHEN 'Cancelada' THEN 4 END,
-        a.due_at ASC,
-        a.created_at DESC
+        ${wherePriority}
+        ${whereOwner}
+        ${whereDueFrom}
+        ${whereDueTo}
+      ${orderBy}
       OFFSET @offset ROWS FETCH NEXT @page_size ROWS ONLY;
     `);
 

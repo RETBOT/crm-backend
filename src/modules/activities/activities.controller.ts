@@ -85,7 +85,7 @@ export async function getActivityTypesHandler(_req: Request, res: Response): Pro
   res.json(data);
 }
 
-export async function getActivityUsersHandler(_req: Request, res: Response): Promise<void> {
+export async function getActivityUsersHandler(req: Request, res: Response): Promise<void> {
   try {
     const data = await getUsersForAssignment(req.auth!.companyId, req.auth!.userId);
     res.json(data);

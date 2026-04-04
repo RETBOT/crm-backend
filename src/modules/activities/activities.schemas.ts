@@ -7,6 +7,12 @@ export const activitiesListSchema = z.object({
   SEARCH: z.string().optional().default(""),
   NPAG: z.coerce.number().optional().default(1),
   TPAG: z.coerce.number().optional().default(20),
+  PRIORITY: z.string().optional().default(""),
+  OWNER_USER_ID: z.coerce.number().optional().nullable(),
+  DUE_FROM: z.string().optional().nullable(),
+  DUE_TO: z.string().optional().nullable(),
+  SORT_BY: z.string().optional().default("status"),
+  SORT_DIR: z.enum(["ASC", "DESC"]).optional().default("ASC"),
 });
 
 export const activityCreateSchema = z

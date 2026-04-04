@@ -14,13 +14,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - SQL migration `add_sucursalid_to_view.sql` - agrega SUCURSALID a vista vw_cn_clientes
 - `activityCheckinsListSchema` con filtro TYPE opcional
 - `getActivityCheckins()` en service: query con scope, filtros de fecha/tipo/usuario
+- Filtros avanzados en actividades: prioridad, responsable, rango de fechas
+- Ordenamiento dinámico en actividades por fecha, prioridad, estado, fecha de creación
 
 ### Changed
 - `completeActivity` ahora acepta `NOTES` como parámetro y las append al campo existente con separador `--- Check-in ---`
 - `getActivityCheckins` ahora devuelve `a.notes AS NOTES` en el SELECT
 - `listCustomers`: filtro de sucursal usa `SUCURSALID` en vez de `SUCURSAL` (comparación por ID)
-- `assertCustomerInScope`: siempre busca por `customer_code` en vez de detectar tipo numérico
-- `listContacts`: resuelve `customer_code` → `customer_id` antes de buscar (soporta ambos formatos)
+- `listContacts`: siempre busca por `customer_code` (eliminado bug de detección numérica que confundía PK con código)
+- `getActivityUsersHandler`: corregido `_req` → `req` (error "req is not defined")
+- `activitiesListSchema`: agregados campos PRIORITY, OWNER_USER_ID, DUE_FROM, DUE_TO, SORT_BY, SORT_DIR
+- `listActivities`: agregados filtros por prioridad, responsable, rango de fechas y ordenamiento dinámico
+
+### Fixed
+- Bug crítico en `listContacts`: detectaba si CLIENTEID era numérico y buscaba por PK en vez de customer_code → "No tiene acceso a este cliente/prospecto"
+- Bug en `getActivityUsersHandler`: parámetro `_req` no se podía usar como `req` → error 400
 
 ---
 

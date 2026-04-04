@@ -165,29 +165,15 @@ export async function listContacts(companyId: number, userId: number, input: Con
   let resolvedCustomerId: number | null = null;
   if (input.CLIENTEID && input.CLIENTEID !== "" && input.CLIENTEID !== "0") {
     const clientIdStr = String(input.CLIENTEID);
-    const isNumeric = /^\d+$/.test(clientIdStr);
-
-    if (isNumeric) {
-      const lookup = await pool
-        .request()
-        .input("company_id", sql.Int, companyId)
-        .input("customer_id", sql.Int, Number(clientIdStr))
-        .query<{ customer_id: number }>(`
-          SELECT customer_id FROM crm.customers
-          WHERE company_id = @company_id AND customer_id = @customer_id;
-        `);
-      resolvedCustomerId = lookup.recordset[0]?.customer_id ?? null;
-    } else {
-      const lookup = await pool
-        .request()
-        .input("company_id", sql.Int, companyId)
-        .input("customer_code", sql.VarChar(30), clientIdStr)
-        .query<{ customer_id: number }>(`
-          SELECT customer_id FROM crm.customers
-          WHERE company_id = @company_id AND customer_code = @customer_code;
-        `);
-      resolvedCustomerId = lookup.recordset[0]?.customer_id ?? null;
-    }
+    const lookup = await pool
+      .request()
+      .input("company_id", sql.Int, companyId)
+      .input("customer_code", sql.VarChar(30), clientIdStr)
+      .query<{ customer_id: number }>(`
+        SELECT customer_id FROM crm.customers
+        WHERE company_id = @company_id AND customer_code = @customer_code;
+      `);
+    resolvedCustomerId = lookup.recordset[0]?.customer_id ?? null;
   }
 
   const whereCustomer = resolvedCustomerId ? "AND v.customer_id = @customer_id" : "";
