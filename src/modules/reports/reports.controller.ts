@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { getPool, sql } from "../../db/sqlserver";
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
+import xss from "xss";
 import { abcError, abcSuccess } from "../../shared/legacy-response";
 import { PERMISSIONS } from "../auth/permissions";
 import { logger } from "../../config/logger";
@@ -364,12 +365,20 @@ export async function getProductsReportHandler(req: Request, res: Response): Pro
 // EXPORTACIÓN
 // ============================================
 
+// Helper: Sanitizar strings para prevenir XSS en reportes
+function sanitizeValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return xss(value, { whiteList: {}, stripIgnoreTag: true, stripIgnoreTagBody: ["script"] });
+  }
+  return value;
+}
+
 // Helper: Traducir keys de un array de objetos
 function translateRowArray(rows: any[]): any[] {
   return rows.map((row: any) => {
     const newRow: any = {};
     for (const [k, v] of Object.entries(row)) {
-      newRow[translateColumnName(k)] = v;
+      newRow[translateColumnName(k)] = sanitizeValue(v);
     }
     return newRow;
   });

@@ -4,7 +4,7 @@ import { logger } from "../config/logger";
 
 logger.info({ host: env.smtp.host, port: env.smtp.port, user: env.smtp.user }, "SMTP configuration loaded");
 
-const transporter = nodemailer.createTransport({
+export const transporter = nodemailer.createTransport({
   host: env.smtp.host,
   port: env.smtp.port,
   secure: false,
@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
     pass: env.smtp.pass,
   },
   tls: {
-    rejectUnauthorized: false,
+    rejectUnauthorized: env.nodeEnv === "production",
   },
 });
 

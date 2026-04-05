@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { passwordSchema } from "../auth/auth.schemas";
 
 export const createUserSchema = z.object({
   username: z.string().min(3).max(50),
   display_name: z.string().min(3).max(140),
   email: z.string().email().optional().or(z.literal("")),
-  password: z.string().min(6).max(100),
+  password: passwordSchema,
   default_branch_id: z.coerce.number().int().positive().nullable().optional(),
   is_active: z.boolean().optional().default(true),
   role_ids: z.array(z.coerce.number().int().positive()).optional().default([]),
@@ -48,7 +49,7 @@ export const updatePermissionSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  password: z.string().min(6, "Minimo 6 caracteres").max(100),
+  password: passwordSchema,
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

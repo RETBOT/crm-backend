@@ -1,9 +1,9 @@
 import cron from "node-cron";
-import nodemailer from "nodemailer";
 import ExcelJS from "exceljs";
 import { getPool, sql } from "../../db/sqlserver";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
+import { transporter } from "../../shared/email";
 import {
   getDashboardExecutive,
   getSalesReport,
@@ -65,16 +65,6 @@ async function sendScheduledEmail(
   reportType: string,
   excelBuffer: Buffer
 ): Promise<void> {
-  const transporter = nodemailer.createTransport({
-    host: env.smtp.host,
-    port: env.smtp.port,
-    secure: false,
-    auth: {
-      user: env.smtp.user,
-      pass: env.smtp.pass,
-    },
-  });
-
   await transporter.sendMail({
     from: env.smtp.from,
     to: recipients.join(", "),

@@ -2,6 +2,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import { env } from "./config/env";
 import { logger } from "./config/logger";
@@ -22,6 +23,30 @@ import { startReportScheduler } from "./modules/reports/reports.scheduler";
 import { errorHandler } from "./middlewares/error-handler";
 import { notFoundHandler } from "./middlewares/not-found";
 
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Demasiadas solicitudes, intenta de nuevo mas tarde" },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Demasiados intentos de inicio de sesion" },
+});
+
+const exportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Demasiadas exportaciones, intenta de nuevo mas tarde" },
+});
+
 export function createApp() {
   const app = express();
 
@@ -35,6 +60,7 @@ export function createApp() {
   app.use(express.json({ limit: "2mb" }));
   app.use(cookieParser());
   app.use(pinoHttp({ logger }));
+  app.use("/api", globalLimiter);
 
   app.get("/api/health", async (_req, res) => {
     try {
@@ -46,7 +72,7 @@ export function createApp() {
     }
   });
 
-  app.use("/api/login", authRoutes);
+  app.use("/api/login", authLimiter, authRoutes);
 
   app.use("/api/cn", requireAuth, catalogRoutes);
   app.use("/api/cn", requireAuth, customersRoutes);
@@ -56,13 +82,12 @@ export function createApp() {
   app.use("/api", requireAuth, notificationsRoutes);
   app.use("/api/dashboard", requireAuth, dashboardRoutes);
   app.use("/api/admin", requireAuth, adminRoutes);
-  app.use("/api/reports", requireAuth, reportsRoutes);
+  app.use("/api/reports", exportLimiter, requireAuth, reportsRoutes);
   app.use("/api/profile", requireAuth, profileRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
 
-  // Start report scheduler
   startReportScheduler();
 
   return app;

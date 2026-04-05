@@ -21,12 +21,19 @@ type UserRow = {
   permissions: string[];
 };
 
+function getKeyAndIV(secret: string) {
+  const hash = crypto.createHash("sha256").update(secret).digest("hex");
+  return {
+    key: CryptoJS.enc.Hex.parse(hash.substring(0, 64)),
+    iv: CryptoJS.enc.Hex.parse(hash.substring(64, 96)),
+  };
+}
+
 function decryptPasswordIfPossible(cipherOrPlain: string): string {
   if (!env.appSecretKey) return cipherOrPlain;
 
   try {
-    const key = CryptoJS.enc.Utf8.parse(env.appSecretKey);
-    const iv = CryptoJS.enc.Utf8.parse(env.appSecretKey);
+    const { key, iv } = getKeyAndIV(env.appSecretKey);
     const decrypted = CryptoJS.AES.decrypt(cipherOrPlain, key, {
       iv,
       mode: CryptoJS.mode.CBC,
@@ -112,12 +119,11 @@ export async function validateUser(username: string, encryptedOrPlainPassword: s
 
   const candidate = decryptPasswordIfPossible(encryptedOrPlainPassword);
 
-  let passwordOk = false;
-  if (user.password_hash.startsWith("$2")) {
-    passwordOk = await bcrypt.compare(candidate, user.password_hash);
-  } else {
-    passwordOk = candidate === user.password_hash || encryptedOrPlainPassword === user.password_hash;
+  if (!user.password_hash.startsWith("$2")) {
+    throw new HttpError(401, "Usuario o contraseña incorrectos");
   }
+
+  const passwordOk = await bcrypt.compare(candidate, user.password_hash);
 
   if (!passwordOk) {
     throw new HttpError(401, "Usuario o contraseña incorrectos");
@@ -221,5 +227,13 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
       UPDATE sec.password_reset_tokens
       SET used_at = SYSUTCDATETIME()
       WHERE token_hash = @token_hash;
+    `);
+
+  await pool.request()
+    .input("user_id", sql.Int, tokenRecord.user_id)
+    .query(`
+      UPDATE sec.password_reset_tokens
+      SET used_at = SYSUTCDATETIME()
+      WHERE user_id = @user_id AND used_at IS NULL AND token_hash <> @token_hash;
     `);
 }

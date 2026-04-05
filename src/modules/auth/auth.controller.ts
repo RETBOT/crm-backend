@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { forgotPasswordSchema, loginSchema, resetPasswordSchema } from "./auth.schemas";
-import { buildLoginPayload, forgotPassword, resetPasswordWithToken, validateUser } from "./auth.service";
+import { forgotPasswordSchema, loginSchema, refreshSchema, resetPasswordSchema } from "./auth.schemas";
+import { buildLoginPayload, findUserByUsername, forgotPassword, resetPasswordWithToken, validateUser } from "./auth.service";
 import { loginError, loginSuccess } from "../../shared/legacy-response";
 
 export async function loginAccess(req: Request, res: Response): Promise<void> {
@@ -16,10 +16,14 @@ export async function loginAccess(req: Request, res: Response): Promise<void> {
 }
 
 export async function refreshToken(req: Request, res: Response): Promise<void> {
-  const parsed = loginSchema.parse(req.body);
+  const parsed = refreshSchema.parse(req.body);
 
   try {
-    const user = await validateUser(parsed.username, parsed.password);
+    const user = await findUserByUsername(parsed.username);
+    if (!user || !user.is_active) {
+      res.status(401).json({ message: "No se pudo renovar el token" });
+      return;
+    }
     const payload = buildLoginPayload(user);
     res.json(payload.token);
   } catch {

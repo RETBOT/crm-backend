@@ -124,13 +124,12 @@ export async function changeMyPassword(userId: number, currentPassword: string, 
   }
 
   const passwordHash = user.recordset[0].password_hash;
-  let passwordOk = false;
 
-  if (passwordHash.startsWith("$2")) {
-    passwordOk = await bcrypt.compare(currentPassword, passwordHash);
-  } else {
-    passwordOk = currentPassword === passwordHash;
+  if (!passwordHash.startsWith("$2")) {
+    throw new HttpError(400, "La contrasena actual es incorrecta");
   }
+
+  const passwordOk = await bcrypt.compare(currentPassword, passwordHash);
 
   if (!passwordOk) {
     throw new HttpError(400, "La contrasena actual es incorrecta");
