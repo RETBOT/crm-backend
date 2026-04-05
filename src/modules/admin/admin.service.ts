@@ -308,6 +308,15 @@ export async function upsertUserScope(companyId: number, userId: number, input: 
       }
     }
 
+    const isMultiBranch = input.scope_type === "ALL" || input.branch_ids.length >= 2 ? 1 : 0;
+    await new sql.Request(tx)
+      .input("user_id", sql.Int, userId)
+      .input("is_multi_branch", sql.Bit, isMultiBranch)
+      .query(`
+        UPDATE sec.users SET is_multi_branch = @is_multi_branch, updated_at = SYSUTCDATETIME()
+        WHERE user_id = @user_id;
+      `);
+
     await tx.commit();
   } catch (error) {
     await tx.rollback();
@@ -330,7 +339,6 @@ export async function createUser(companyId: number, input: CreateUserInput) {
       .input("email", sql.NVarChar(160), input.email || null)
       .input("password_hash", sql.NVarChar(255), passwordHash)
       .input("default_branch_id", sql.Int, input.default_branch_id || null)
-      .input("is_multi_branch", sql.Bit, input.is_multi_branch)
       .input("is_active", sql.Bit, input.is_active)
       .query<{ user_id: number }>(`
         INSERT INTO sec.users (
@@ -340,7 +348,7 @@ export async function createUser(companyId: number, input: CreateUserInput) {
         OUTPUT INSERTED.user_id
         VALUES (
           @company_id, @username, @display_name, @email, @password_hash,
-          @default_branch_id, @is_multi_branch, @is_active, SYSUTCDATETIME(), SYSUTCDATETIME()
+          @default_branch_id, 0, @is_active, SYSUTCDATETIME(), SYSUTCDATETIME()
         );
       `);
 
@@ -377,6 +385,61 @@ export async function createUser(companyId: number, input: CreateUserInput) {
     }
     throw error;
   }
+}
+
+export async function updateUser(companyId: number, userId: number, input: {
+  display_name?: string;
+  email?: string;
+  default_branch_id?: number | null;
+  is_active?: boolean;
+}) {
+  const pool = await getPool();
+
+  const existing = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("user_id", sql.Int, userId)
+    .query(`
+      SELECT user_id, username FROM sec.users
+      WHERE company_id = @company_id AND user_id = @user_id;
+    `);
+
+  if (!existing.recordset[0]) {
+    throw new HttpError(404, "Usuario no encontrado");
+  }
+
+  const sets: string[] = [];
+  const request = pool.request()
+    .input("company_id", sql.Int, companyId)
+    .input("user_id", sql.Int, userId);
+
+  if (input.display_name !== undefined) {
+    sets.push("display_name = @display_name");
+    request.input("display_name", sql.NVarChar(140), input.display_name);
+  }
+  if (input.email !== undefined) {
+    sets.push("email = @email");
+    request.input("email", sql.NVarChar(160), input.email || null);
+  }
+  if (input.default_branch_id !== undefined) {
+    sets.push("default_branch_id = @default_branch_id");
+    request.input("default_branch_id", sql.Int, input.default_branch_id || null);
+  }
+  if (input.is_active !== undefined) {
+    sets.push("is_active = @is_active");
+    request.input("is_active", sql.Bit, input.is_active);
+  }
+
+  if (sets.length === 0) {
+    throw new HttpError(400, "No hay cambios para actualizar");
+  }
+
+  sets.push("updated_at = SYSUTCDATETIME()");
+
+  await request.query(`
+    UPDATE sec.users SET ${sets.join(", ")}
+    WHERE company_id = @company_id AND user_id = @user_id;
+  `);
 }
 
 export async function updateUserRoles(companyId: number, userId: number, roleIds: number[]) {

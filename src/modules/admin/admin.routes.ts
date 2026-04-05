@@ -16,6 +16,7 @@ import {
   putAdminPermission,
   deleteAdminPermission,
   putAdminResetPassword,
+  putAdminUser,
 } from "./admin.controller";
 import { requireAnyPermission, requirePermission } from "../../middlewares/permissions";
 import { PERMISSIONS } from "../auth/permissions";
@@ -47,6 +48,7 @@ router.get(
   getAdminUsers
 );
 router.post("/users", requirePermission(PERMISSIONS.USERS_MANAGE), postAdminCreateUser);
+router.put("/users/:userId", requirePermission(PERMISSIONS.USERS_MANAGE), putAdminUser);
 router.put("/users/:userId/roles", requirePermission(PERMISSIONS.ROLES_MANAGE), putAdminUserRoles);
 router.get("/users/:userId/scope", requirePermission(PERMISSIONS.SCOPE_MANAGE), getAdminUserScope);
 router.put("/users/:userId/scope", requirePermission(PERMISSIONS.SCOPE_MANAGE), putAdminUserScope);

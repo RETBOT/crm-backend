@@ -6,13 +6,19 @@ export const createUserSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   password: z.string().min(6).max(100),
   default_branch_id: z.coerce.number().int().positive().nullable().optional(),
-  is_multi_branch: z.boolean().optional().default(false),
   is_active: z.boolean().optional().default(true),
   role_ids: z.array(z.coerce.number().int().positive()).optional().default([]),
 });
 
 export const updateUserRolesSchema = z.object({
   role_ids: z.array(z.coerce.number().int().positive()).default([]),
+});
+
+export const updateUserSchema = z.object({
+  display_name: z.string().min(3).max(140).optional(),
+  email: z.string().email().optional().or(z.literal("")).optional(),
+  default_branch_id: z.coerce.number().int().positive().nullable().optional(),
+  is_active: z.boolean().optional(),
 });
 
 export const createRoleSchema = z.object({

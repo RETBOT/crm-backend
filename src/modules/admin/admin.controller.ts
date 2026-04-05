@@ -8,6 +8,7 @@ import {
   createPermissionSchema,
   updatePermissionSchema,
   resetPasswordSchema,
+  updateUserSchema,
 } from "./admin.schemas";
 import {
   createRole,
@@ -26,6 +27,7 @@ import {
   updatePermission,
   deletePermission,
   resetUserPassword,
+  updateUser,
 } from "./admin.service";
 
 export async function getAdminPermissions(_req: Request, res: Response): Promise<void> {
@@ -63,6 +65,13 @@ export async function postAdminCreateUser(req: Request, res: Response): Promise<
   const input = createUserSchema.parse(req.body ?? {});
   const userId = await createUser(req.auth!.companyId, input);
   res.status(201).json({ ok: true, user_id: userId, message: "Usuario creado correctamente" });
+}
+
+export async function putAdminUser(req: Request, res: Response): Promise<void> {
+  const userId = Number(req.params.userId);
+  const parsed = updateUserSchema.parse(req.body ?? {});
+  await updateUser(req.auth!.companyId, userId, parsed);
+  res.json({ ok: true, message: "Usuario actualizado correctamente" });
 }
 
 export async function putAdminUserRoles(req: Request, res: Response): Promise<void> {

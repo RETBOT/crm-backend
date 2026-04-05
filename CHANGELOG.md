@@ -36,6 +36,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - Operador de precedencia en deteccion de columnas de moneda en PDF
 
 ### Added
+- Endpoint `PUT /api/admin/users/:userId` para editar perfil de usuario existente (nombre, email, sucursal, activo, multi-sucursal)
+- Permiso `users.manage` requerido para editar usuarios
+- Auto-deteccion de `is_multi_branch`: se activa automaticamente cuando el usuario tiene 2+ sucursales o scope ALL
+
+### Fixed
+- `is_multi_branch` ya no es editable manualmente, se calcula automaticamente al guardar alcance de datos
+
+### Added
 - Modulo completo de reportes con 6 tipos: Dashboard, Ventas, Clientes, Actividades, Oportunidades, Productos
 - Exportacion a Excel (multi-hoja con exceljs), PDF (multi-seccion con pdfkit) y CSV
 - Vistas guardadas: CRUD completo para guardar/cargar configuraciones de filtros
