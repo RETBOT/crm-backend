@@ -7,6 +7,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Campo `last_login_at` en respuesta de lista de usuarios (admin)
+
+### Fixed
 - Portada profesional en exportaciones Excel con logo, titulo del reporte, fecha y filtros aplicados
 - Portada profesional en exportaciones PDF con diseño corporativo, fecha y filtros aplicados
 - Tabla de contenido en exportaciones PDF

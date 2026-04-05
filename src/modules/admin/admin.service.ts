@@ -67,6 +67,7 @@ export async function listUsers(companyId: number) {
       u.is_multi_branch,
       u.default_branch_id,
       b.branch_name,
+      u.last_login_at,
       r.role_id,
       r.role_name
     FROM sec.users u
@@ -92,6 +93,7 @@ export async function listUsers(companyId: number) {
         is_multi_branch: row.is_multi_branch,
         default_branch_id: row.default_branch_id,
         branch_name: row.branch_name,
+        last_login_at: row.last_login_at,
         roles: [],
       });
     }
