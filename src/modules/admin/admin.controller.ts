@@ -28,6 +28,7 @@ import {
   deletePermission,
   resetUserPassword,
   updateUser,
+  sendAdminPasswordResetEmail,
 } from "./admin.service";
 
 export async function getAdminPermissions(_req: Request, res: Response): Promise<void> {
@@ -137,4 +138,10 @@ export async function putAdminResetPassword(req: Request, res: Response): Promis
   const parsed = resetPasswordSchema.parse(req.body ?? {});
   await resetUserPassword(req.auth!.companyId, targetUserId, parsed.password);
   res.json({ ok: true, message: "Contrasena actualizada correctamente" });
+}
+
+export async function postAdminSendPasswordResetEmail(req: Request, res: Response): Promise<void> {
+  const targetUserId = Number(req.params.userId);
+  const result = await sendAdminPasswordResetEmail(req.auth!.companyId, targetUserId);
+  res.json({ ok: true, message: result.message });
 }

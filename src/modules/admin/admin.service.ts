@@ -3,6 +3,9 @@ import { getPool, sql } from "../../db/sqlserver";
 import { HttpError } from "../../shared/http-error";
 import { CreateRoleInput, CreateUserInput, UpsertUserScopeInput, CreatePermissionInput, UpdatePermissionInput } from "./admin.schemas";
 import { resolveUserScope } from "../scope/scope.service";
+import crypto from "crypto";
+import { sendPasswordResetEmail } from "../../shared/email";
+import { env } from "../../config/env";
 
 export async function listPermissions() {
   const pool = await getPool();
@@ -768,4 +771,49 @@ export async function resetUserPassword(companyId: number, targetUserId: number,
           updated_at = SYSUTCDATETIME()
       WHERE company_id = @company_id AND user_id = @user_id;
     `);
+}
+
+export async function sendAdminPasswordResetEmail(companyId: number, targetUserId: number): Promise<{ message: string }> {
+  const pool = await getPool();
+
+  const existing = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("user_id", sql.Int, targetUserId)
+    .query<{ user_id: number; username: string; display_name: string; email: string | null; is_active: boolean }>(`
+      SELECT user_id, username, display_name, email, is_active
+      FROM sec.users
+      WHERE company_id = @company_id AND user_id = @user_id;
+    `);
+
+  const user = existing.recordset[0];
+  if (!user) {
+    throw new HttpError(404, "Usuario no encontrado");
+  }
+
+  if (!user.is_active) {
+    throw new HttpError(400, "No se puede enviar reseteo a un usuario inactivo");
+  }
+
+  if (!user.email) {
+    throw new HttpError(400, "El usuario no tiene un correo registrado");
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  await pool.request()
+    .input("user_id", sql.Int, user.user_id)
+    .input("token_hash", sql.NVarChar(255), tokenHash)
+    .input("expires_at", sql.DateTime2, expiresAt)
+    .query(`
+      INSERT INTO sec.password_reset_tokens (user_id, token_hash, expires_at, created_at)
+      VALUES (@user_id, @token_hash, @expires_at, SYSUTCDATETIME());
+    `);
+
+  const resetLink = `${env.appUrl}/auth/reset-password?token=${token}`;
+  await sendPasswordResetEmail(user.email, user.display_name || user.username, resetLink);
+
+  return { message: `Se envió el enlace de recuperación a ${user.email}` };
 }

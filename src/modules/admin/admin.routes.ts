@@ -17,6 +17,7 @@ import {
   deleteAdminPermission,
   putAdminResetPassword,
   putAdminUser,
+  postAdminSendPasswordResetEmail,
 } from "./admin.controller";
 import { requireAnyPermission, requirePermission } from "../../middlewares/permissions";
 import { PERMISSIONS } from "../auth/permissions";
@@ -56,5 +57,6 @@ router.post("/permissions", requirePermission(PERMISSIONS.ROLES_MANAGE), postAdm
 router.put("/permissions/:permissionId", requirePermission(PERMISSIONS.ROLES_MANAGE), putAdminPermission);
 router.delete("/permissions/:permissionId", requirePermission(PERMISSIONS.ROLES_MANAGE), deleteAdminPermission);
 router.put("/users/:userId/password", requirePermission(PERMISSIONS.USERS_MANAGE), putAdminResetPassword);
+router.post("/users/:userId/send-reset-email", requirePermission(PERMISSIONS.USERS_MANAGE), postAdminSendPasswordResetEmail);
 
 export { router as adminRoutes };
