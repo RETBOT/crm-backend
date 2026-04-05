@@ -49,6 +49,7 @@ src/
 │   ├── notifications/          # Notificaciones del sistema
 │   ├── opportunities/          # Pipeline de oportunidades
 │   ├── products/               # Catálogo de productos
+│   ├── profile/                # Perfil personal del usuario
 │   ├── reports/                # Reportes y exportación de datos
 │   └── scope/                  # Alcance de datos por usuario (ALL/BRANCH/ROUTE)
 └── shared/
@@ -146,7 +147,10 @@ src/
 |--------|------|---------|-------------|
 | GET | `/api/admin/users` | users.manage/roles.manage/scope.manage | Listar usuarios |
 | POST | `/api/admin/users` | users.manage | Crear usuario |
+| PUT | `/api/admin/users/:id` | users.manage | Editar usuario (nombre, email, sucursal, activo) |
 | PUT | `/api/admin/users/:id/roles` | roles.manage | Asignar roles a usuario |
+| PUT | `/api/admin/users/:id/password` | users.manage | Resetear contraseña manualmente |
+| POST | `/api/admin/users/:id/send-reset-email` | users.manage | Enviar enlace de recuperación por email |
 | GET | `/api/admin/roles` | roles.manage | Listar roles |
 | POST | `/api/admin/roles` | roles.manage | Crear rol |
 | PUT | `/api/admin/roles/:id/permissions` | roles.manage | Actualizar permisos del rol |
@@ -159,6 +163,13 @@ src/
 | GET | `/api/admin/routes` | users.manage/roles.manage/scope.manage | Listar rutas |
 | GET | `/api/admin/users/:id/scope` | scope.manage | Ver alcance de usuario |
 | PUT | `/api/admin/users/:id/scope` | scope.manage | Actualizar alcance de usuario |
+
+### Perfil Personal
+| Método | Ruta | Permiso | Descripción |
+|--------|------|---------|-------------|
+| GET | `/api/profile/me` | Auth (propio) | Obtener datos del perfil propio |
+| PUT | `/api/profile/me` | Auth (propio) | Actualizar nombre y email propios |
+| PUT | `/api/profile/me/password` | Auth (propio) | Cambiar contraseña propia (valida actual) |
 
 ## Permisos
 
@@ -296,9 +307,9 @@ El sistema incluye un módulo completo de reportes con:
 - **Productos**: Por categoría, stock, precios
 
 ### Exportación
-- **Excel**: Multi-hoja con formato (headers azules, filas alternadas, auto-width, freeze header)
-- **PDF**: Multi-sección con resumen, KPIs, gráficos como tablas, datos detallados
-- **CSV**: UTF-8 con BOM para compatibilidad con Excel
+- **Excel**: Multi-hoja con portada profesional, formato de moneda MXN, filtros aplicados, nombres de columnas en español
+- **PDF**: Portada corporativa, tabla de contenido, secciones agrupadas, datos detallados (hasta 300 filas)
+- **CSV**: UTF-8 con BOM para compatibilidad con Excel, columnas traducidas al español
 
 ### Vistas Guardadas
 - Guarda configuraciones de filtros con nombre
