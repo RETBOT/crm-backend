@@ -1077,6 +1077,7 @@ export async function getProductsReport(
       p.product_id,
       p.product_name,
       p.sku,
+      COALESCE(pc.category_name, 'Sin categoría') AS category_name,
       SUM(ISNULL(oi.quantity, 0)) AS total_quantity,
       SUM(ISNULL(oi.quantity, 0) * ISNULL(oi.unit_price, 0)) AS total_sales,
       COUNT(DISTINCT o.opportunity_id) AS opportunity_count,
@@ -1085,19 +1086,20 @@ export async function getProductsReport(
     INNER JOIN crm.opportunities o ON o.company_id = oi.company_id AND o.opportunity_id = oi.opportunity_id
     INNER JOIN crm.customers c ON c.company_id = o.company_id AND c.customer_id = o.customer_id
     LEFT JOIN crm.products p ON p.company_id = oi.company_id AND p.product_id = oi.product_id
+    LEFT JOIN crm.product_categories pc ON pc.company_id = p.company_id AND pc.category_id = p.category_id
     WHERE o.company_id = @company_id
       AND o.status = 'ganada'
       AND (@start_date IS NULL OR o.close_date >= @start_date)
       AND (@end_date IS NULL OR o.close_date <= @end_date)
       AND ${scopeSql("c")}
-    GROUP BY p.product_id, p.product_name, p.sku
+    GROUP BY p.product_id, p.product_name, p.sku, pc.category_name
     ORDER BY total_sales DESC;
   `);
 
-  // Por categoría - agrupar por sku como alternativa
+  // Por categoría real
   const salesByCategoryRes = await request.query(`
     SELECT
-      ISNULL(p.sku, 'Sin SKU') AS category,
+      COALESCE(pc.category_name, 'Sin categoría') AS category_name,
       SUM(ISNULL(oi.quantity, 0) * ISNULL(oi.unit_price, 0)) AS total_sales,
       COUNT(DISTINCT p.product_id) AS product_count,
       COUNT(DISTINCT o.opportunity_id) AS opportunity_count
@@ -1105,12 +1107,13 @@ export async function getProductsReport(
     INNER JOIN crm.opportunities o ON o.company_id = oi.company_id AND o.opportunity_id = oi.opportunity_id
     INNER JOIN crm.customers c ON c.company_id = o.company_id AND c.customer_id = o.customer_id
     LEFT JOIN crm.products p ON p.company_id = oi.company_id AND p.product_id = oi.product_id
+    LEFT JOIN crm.product_categories pc ON pc.company_id = p.company_id AND pc.category_id = p.category_id
     WHERE o.company_id = @company_id
       AND o.status = 'ganada'
       AND (@start_date IS NULL OR o.close_date >= @start_date)
       AND (@end_date IS NULL OR o.close_date <= @end_date)
       AND ${scopeSql("c")}
-    GROUP BY ISNULL(p.sku, 'Sin SKU')
+    GROUP BY COALESCE(pc.category_name, 'Sin categoría')
     ORDER BY total_sales DESC;
   `);
 
@@ -1143,18 +1146,19 @@ export async function getProductsReport(
   );
 
   return {
-    salesByProduct: (salesByProductRes.recordset as ProductSalesRow[]).map((row) => ({
+    salesByProduct: (salesByProductRes.recordset as any[]).map((row) => ({
       productId: row.product_id,
       productName: row.product_name,
-      category: row.sku || 'Sin SKU',
+      sku: row.sku,
+      category: row.category_name || 'Sin categoría',
       totalQuantity: Number(row.total_quantity),
       totalSales: Number(row.total_sales),
       opportunityCount: Number(row.opportunity_count),
       avgPrice: Number(row.avg_price),
       percentage: totalSales > 0 ? (Number(row.total_sales) / totalSales) * 100 : 0,
     })),
-    salesByCategory: (salesByCategoryRes.recordset as CategorySalesRow[]).map((row) => ({
-      category: row.category,
+    salesByCategory: (salesByCategoryRes.recordset as any[]).map((row) => ({
+      category: row.category_name,
       totalSales: Number(row.total_sales),
       productCount: Number(row.product_count),
       opportunityCount: Number(row.opportunity_count),

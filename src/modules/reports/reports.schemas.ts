@@ -33,7 +33,7 @@ export const reportTypeSchema = z.enum([
 // Exportación
 export const exportReportSchema = z.object({
   REPORT_TYPE: reportTypeSchema,
-  FORMAT: z.enum(["excel", "pdf"]).default("excel"),
+  FORMAT: z.enum(["excel", "pdf", "csv"]).default("excel"),
   FILTERS: reportFilterSchema.optional(),
   FILENAME: z.string().optional(),
 });
@@ -56,7 +56,7 @@ export const savedViewUpdateSchema = z.object({
 export const scheduledReportSchema = z.object({
   REPORT_TYPE: reportTypeSchema,
   FREQUENCY: z.enum(["daily", "weekly", "monthly"]),
-  DAY_OF_WEEK: z.number().min(0).max(6).optional().nullable(), // 0=Sunday, 6=Saturday
+  DAY_OF_WEEK: z.number().min(0).max(6).optional().nullable(), // 0=Domingo, 6=Sábado
   DAY_OF_MONTH: z.number().min(1).max(31).optional().nullable(),
   RECIPIENTS: z.array(z.string().email()),
   FILTERS: reportFilterSchema,

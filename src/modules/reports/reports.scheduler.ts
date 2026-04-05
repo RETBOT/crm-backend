@@ -97,7 +97,7 @@ async function sendScheduledEmail(
     ],
   });
 
-  logger.info({ recipients, reportType }, "Scheduled report email sent");
+  logger.info({ recipients, reportType }, "Email de reporte programado enviado");
 }
 
 function calculateNextRun(frequency: string, dayOfWeek?: number, dayOfMonth?: number): Date {
@@ -146,7 +146,7 @@ interface ScheduledReportRow {
 }
 
 export function startReportScheduler(): void {
-  logger.info("Report scheduler started");
+  logger.info("Programador de reportes iniciado");
 
   // Run every minute to check for due reports
   cron.schedule("* * * * *", async () => {
@@ -167,7 +167,7 @@ export function startReportScheduler(): void {
           const generator = reportGenerators[row.report_type];
 
           if (!generator) {
-            logger.warn({ reportType: row.report_type }, "Unknown report type for scheduled report");
+            logger.warn({ reportType: row.report_type }, "Tipo de reporte desconocido para reporte programado");
             continue;
           }
 
@@ -190,13 +190,13 @@ export function startReportScheduler(): void {
               WHERE schedule_id = @schedule_id;
             `);
 
-          logger.info({ schedule_id: row.schedule_id, nextRun }, "Scheduled report processed");
+          logger.info({ schedule_id: row.schedule_id, nextRun }, "Reporte programado procesado");
         } catch (err) {
-          logger.error({ schedule_id: (row as any).schedule_id, error: err }, "Error processing scheduled report");
+          logger.error({ schedule_id: (row as any).schedule_id, error: err }, "Error al procesar reporte programado");
         }
       }
     } catch (err) {
-      logger.error({ error: err }, "Error in report scheduler");
+      logger.error({ error: err }, "Error en el programador de reportes");
     }
   });
 }

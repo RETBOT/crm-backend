@@ -7,6 +7,35 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Portada profesional en exportaciones Excel con logo, titulo del reporte, fecha y filtros aplicados
+- Portada profesional en exportaciones PDF con diseño corporativo, fecha y filtros aplicados
+- Tabla de contenido en exportaciones PDF
+- Formato de moneda MXN ($#,##0.00) en celdas de montos en exportaciones Excel
+- Filtros aplicados incluidos en todas las exportaciones (Excel, PDF, CSV)
+- Nombres de columnas traducidos de ingles a español en todas las exportaciones
+- Opcion de exportacion a CSV en el dropdown del frontend
+- Funciones helper: translateColumnName, translateReportTitle, formatFiltersForDisplay
+
+### Changed
+- Todos los mensajes de log en reports.controller.ts traducidos de ingles a español
+- Todos los mensajes de log en reports.scheduler.ts traducidos de ingles a español
+- Limite de caracteres en tablas PDF aumentado de 20 a 45
+- Limite de filas en datos detallados PDF aumentado de 100 a 300
+- Limite de filas por chart en PDF aumentado de 20 a 50
+- Fuente de tablas PDF aumentada de 7pt a 8pt
+- Altura de filas en tablas PDF aumentada de 16 a 18px
+- Schema de exportacion ahora acepta formato "csv" ademas de "excel" y "pdf"
+- Comentario en scheduledReportSchema traducido (0=Domingo, 6=Sabado)
+
+### Fixed
+- Nombres de columnas en exportaciones mostraban keys internas en ingles (TOTAL SALES, WON COUNT)
+- Datos en JSON en Excel para Clientes, Actividades, Oportunidades y Productos (ahora muestran tablas con columnas correctas)
+- Tablas PDF mostraban datos en cascada/picada (ahora alineados horizontalmente)
+- Reporte de Productos: SKU aparecia como "Categoría" (ahora usa JOIN con product_categories)
+- Formato de moneda no aplicaba en Excel para columnas traducidas al español
+- Operador de precedencia en deteccion de columnas de moneda en PDF
+
+### Added
 - Modulo completo de reportes con 6 tipos: Dashboard, Ventas, Clientes, Actividades, Oportunidades, Productos
 - Exportacion a Excel (multi-hoja con exceljs), PDF (multi-seccion con pdfkit) y CSV
 - Vistas guardadas: CRUD completo para guardar/cargar configuraciones de filtros
