@@ -13,6 +13,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - Formato de moneda MXN ($#,##0.00) en celdas de montos en exportaciones Excel
 - Filtros aplicados incluidos en todas las exportaciones (Excel, PDF, CSV)
 - Nombres de columnas traducidos de ingles a español en todas las exportaciones
+- Nuevos endpoints de perfil propio: `GET /api/profile/me`, `PUT /api/profile/me`, `PUT /api/profile/me/password`
+- Modulo de perfil personal (`profile.service.ts`, `profile.controller.ts`, `profile.routes.ts`)
 - Opcion de exportacion a CSV en el dropdown del frontend
 - Funciones helper: translateColumnName, translateReportTitle, formatFiltersForDisplay
 
