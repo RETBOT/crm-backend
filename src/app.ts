@@ -19,6 +19,9 @@ import { productsRoutes } from "./modules/products/products.routes";
 import { notificationsRoutes } from "./modules/notifications/notifications.routes";
 import { reportsRoutes } from "./modules/reports/reports.routes";
 import { profileRoutes } from "./modules/profile/profile.routes";
+import { emailRoutes } from "./modules/email/email.routes";
+import { emailAdvancedRoutes } from "./modules/email-advanced/email-advanced.routes";
+import { calendarRoutes } from "./modules/calendar/calendar.routes";
 import { startReportScheduler } from "./modules/reports/reports.scheduler";
 import { errorHandler } from "./middlewares/error-handler";
 import { notFoundHandler } from "./middlewares/not-found";
@@ -29,6 +32,7 @@ const globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Demasiadas solicitudes, intenta de nuevo mas tarde" },
+  skip: (req) => req.path === "/api/notifications/badge",
 });
 
 const authLimiter = rateLimit({
@@ -84,6 +88,9 @@ export function createApp() {
   app.use("/api/admin", requireAuth, adminRoutes);
   app.use("/api/reports", exportLimiter, requireAuth, reportsRoutes);
   app.use("/api/profile", requireAuth, profileRoutes);
+  app.use("/api/email", requireAuth, emailRoutes);
+  app.use("/api/email-advanced", requireAuth, emailAdvancedRoutes);
+  app.use("/api/calendar", requireAuth, calendarRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

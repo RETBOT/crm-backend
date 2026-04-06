@@ -51,7 +51,10 @@ src/
 │   ├── products/               # Catálogo de productos
 │   ├── profile/                # Perfil personal del usuario
 │   ├── reports/                # Reportes y exportación de datos
-│   └── scope/                  # Alcance de datos por usuario (ALL/BRANCH/ROUTE)
+│   ├── email/                # Email integration (enviar correos)
+│   ├── email-advanced/       # Plantillas, tracking, firmas
+│   ├── calendar/             # Sincronizacion de calendario
+│   └── scope/                # Alcance de datos por usuario (ALL/BRANCH/ROUTE)
 └── shared/
     ├── email.ts                # Servicio de email (nodemailer)
     ├── http-error.ts           # Clase de error HTTP
@@ -170,6 +173,37 @@ src/
 | GET | `/api/profile/me` | Auth (propio) | Obtener datos del perfil propio |
 | PUT | `/api/profile/me` | Auth (propio) | Actualizar nombre y email propios |
 | PUT | `/api/profile/me/password` | Auth (propio) | Cambiar contraseña propia (valida actual) |
+
+### Email
+| Método | Ruta | Permiso | Descripción |
+|--------|------|---------|-------------|
+| POST | `/api/email/connect` | Auth | Conectar cuenta de correo (Gmail/Outlook) via OAuth2 |
+| POST | `/api/email/send` | Auth | Enviar correo desde cuenta conectada |
+| GET | `/api/email/history` | Auth | Historial de correos enviados |
+| GET | `/api/email/accounts` | Auth | Cuentas de correo conectadas |
+| GET | `/api/email/oauth-status` | Auth | Verificar credenciales OAuth configuradas |
+| DELETE | `/api/email/disconnect/:provider` | Auth | Desconectar cuenta de correo |
+
+### Email Avanzado
+| Método | Ruta | Permiso | Descripción |
+|--------|------|---------|-------------|
+| GET | `/api/email-advanced/templates` | Auth | Listar plantillas de correo |
+| POST | `/api/email-advanced/templates` | Auth | Crear plantilla de correo |
+| PUT | `/api/email-advanced/templates/:id` | Auth | Actualizar plantilla |
+| DELETE | `/api/email-advanced/templates/:id` | Auth | Eliminar plantilla |
+| POST | `/api/email-advanced/send-with-template` | Auth | Enviar correo con plantilla |
+| GET | `/api/email-advanced/track/open/:emailId` | Público | Tracking pixel de apertura |
+| POST | `/api/email-advanced/track/click` | Público | Tracking de clic en enlace |
+| GET | `/api/email-advanced/signature` | Auth | Obtener firma de correo del usuario |
+| PUT | `/api/email-advanced/signature` | Auth | Guardar firma de correo |
+| GET | `/api/email-advanced/tracking-stats` | Auth | Estadísticas de apertura y clics |
+
+### Calendario
+| Método | Ruta | Permiso | Descripción |
+|--------|------|---------|-------------|
+| POST | `/api/calendar/sync` | Auth | Sincronizar calendario externo (Google/Outlook) |
+| GET | `/api/calendar/events` | Auth | Obtener eventos del calendario + actividades CRM |
+| POST | `/api/calendar/create-activity` | Auth | Crear actividad CRM desde evento externo |
 
 ## Permisos
 

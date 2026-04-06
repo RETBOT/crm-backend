@@ -7,7 +7,29 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Campo `last_login_at` en respuesta de lista de usuarios (admin)
+- Modulo completo de email integration: enviar correos desde Gmail y Outlook sin salir del CRM
+- Modulo completo de calendar integration: sincronizar Google Calendar y Outlook Calendar con el CRM
+- Modulo de email avanzado: plantillas, tracking de apertura/clics, firmas de usuario
+- OAuth2 con Google (Gmail API, Calendar API) y Microsoft (Graph API) para autenticacion de cuentas de correo
+- Endpoints de email: `POST /api/email/connect`, `POST /api/email/send`, `GET /api/email/history`, `GET /api/email/accounts`, `DELETE /api/email/disconnect/:provider`, `GET /api/email/oauth-status`
+- Endpoints de calendario: `POST /api/calendar/sync`, `GET /api/calendar/events`, `POST /api/calendar/create-activity`
+- Endpoints de email avanzado: `GET/POST/PUT/DELETE /api/email-advanced/templates`, `POST /api/email-advanced/send-with-template`, `GET/PUT /api/email-advanced/signature`, `GET /api/email-advanced/tracking-stats`, `GET /api/email-advanced/track/open/:emailId`, `POST /api/email-advanced/track/click`
+- Tablas nuevas: `sec.user_email_accounts`, `crm.email_sent`, `crm.calendar_sync`, `crm.external_events`, `crm.email_templates`, `crm.email_tracking`, `sec.user_signatures`
+- Renovacion automatica de tokens OAuth2 (access_token y refresh_token)
+- Historial de correos enviado con filtros por cliente
+- Variables de entorno: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT`
+- Dependencias: googleapis, google-auth-library, @microsoft/microsoft-graph-client, @azure/msal-node
+
+### Changed
+- Rate limiter global ahora excluye `/api/notifications/badge` para evitar error 429 por polling
+- `getUserId` y `getCompanyId` en email controller ahora leen de `req.auth` en vez de `req.user`
+
+### Fixed
+- `env is not defined` en email controller (faltaba import)
+- Consultas de calendario: columnas incorrectas `activity_type_id` → `activity_type_code`, `activity_type` → `activity_type_name`
+- Creacion de actividades desde evento: usaba `activity_type_id` inexistente, ahora usa `activity_type_code`
+- Scopes de Google OAuth: agregados `calendar` y `calendar.events` para sincronizacion de calendario
+- Scopes de Microsoft OAuth: agregados `Calendars.Read` y `Calendars.ReadWrite`
 
 ### Fixed
 - Portada profesional en exportaciones Excel con logo, titulo del reporte, fecha y filtros aplicados

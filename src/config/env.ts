@@ -50,5 +50,12 @@ export const env = {
     pass: getEnv("SMTP_PASS"),
     from: getEnv("SMTP_FROM"),
   },
+  oauth: {
+    googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    microsoftClientId: process.env.MICROSOFT_CLIENT_ID || "",
+    microsoftClientSecret: process.env.MICROSOFT_CLIENT_SECRET || "",
+    microsoftTenant: process.env.MICROSOFT_TENANT || "common",
+  },
   appUrl: getEnv("APP_URL", "http://localhost:5173"),
 };

@@ -21,6 +21,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@azure/msal-node": "^5.1.2",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -29,6 +31,8 @@
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
+    "google-auth-library": "^10.6.2",
+    "googleapis": "^171.4.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mssql": "^12.2.1",
