@@ -200,7 +200,7 @@ interface ScheduledReportRow {
 
 // Función helper para construir condición de alcance
 function scopeSql(alias: string): string {
-  // Cuando scope_type = 'ALL', permitir ver todos los registros sin filtrar por branch/ruta
+  // Cuando scope_type = 'ALL', permitir ver todos los registros sin filtrar por branch/vendedor
   return `
     (
       @scope_type = 'ALL'
@@ -690,7 +690,7 @@ export async function getCustomersReport(
         COUNT(DISTINCT CASE WHEN c.customer_type = 'PROSPECTO' THEN c.customer_id END) AS total_prospects,
         (SELECT COUNT(DISTINCT c2.customer_id)
          FROM crm.customers c2
-         LEFT JOIN crm.routes r2 ON r2.company_id = c2.company_id AND r2.branch_id = c2.branch_id
+         LEFT JOIN crm.vendedores r2 ON r2.company_id = c2.company_id AND r2.branch_id = c2.branch_id
          WHERE c2.company_id = @company_id
            AND c2.customer_type = 'CLIENTE'
            AND EXISTS (

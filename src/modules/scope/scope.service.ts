@@ -49,9 +49,9 @@ async function getConfiguredScope(
       .request()
       .input("company_id", sql.Int, companyId)
       .input("user_id", sql.Int, userId)
-      .query<{ route_id: number }>(`
-        SELECT route_id
-        FROM sec.user_route_access
+      .query<{ vendedor_id: number }>(`
+        SELECT vendedor_id
+        FROM sec.user_vendedor_access
         WHERE company_id = @company_id
           AND user_id = @user_id;
       `),
@@ -60,7 +60,7 @@ async function getConfiguredScope(
   return {
     scopeType: scopeRes.recordset[0]?.scope_type ?? null,
     branchIds: uniqueInts(branchesRes.recordset.map((r) => r.branch_id)),
-    routeIds: uniqueInts(routesRes.recordset.map((r) => r.route_id)),
+    routeIds: uniqueInts(routesRes.recordset.map((r) => r.vendedor_id)),
   };
 }
 
@@ -82,9 +82,9 @@ async function getFallbackScope(companyId: number, userId: number): Promise<Effe
       .request()
       .input("company_id", sql.Int, companyId)
       .input("user_id", sql.Int, userId)
-      .query<{ route_id: number; branch_id: number }>(`
-        SELECT route_id, branch_id
-        FROM crm.routes
+      .query<{ vendedor_id: number; branch_id: number }>(`
+        SELECT vendedor_id, branch_id
+        FROM crm.vendedores
         WHERE company_id = @company_id
           AND assigned_user_id = @user_id
           AND status = 'ACTIVO';
@@ -100,7 +100,7 @@ async function getFallbackScope(companyId: number, userId: number): Promise<Effe
     return { scopeType: "ALL", branchIds: [], routeIds: [], branchIdsCsv: "", routeIdsCsv: "" };
   }
 
-  const assignedRouteIds = uniqueInts(assignedRoutesRes.recordset.map((r) => r.route_id));
+  const assignedRouteIds = uniqueInts(assignedRoutesRes.recordset.map((r) => r.vendedor_id));
   const assignedBranchIds = uniqueInts(assignedRoutesRes.recordset.map((r) => r.branch_id));
 
   if (assignedRouteIds.length > 0 && assignedBranchIds.length > 0) {

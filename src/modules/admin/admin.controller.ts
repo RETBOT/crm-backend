@@ -42,7 +42,9 @@ export async function getAdminRoles(req: Request, res: Response): Promise<void> 
 }
 
 export async function getAdminUsers(req: Request, res: Response): Promise<void> {
-  const data = await listUsers(req.auth!.companyId);
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.max(1, Math.min(100, Number(req.query.pageSize) || 50));
+  const data = await listUsers(req.auth!.companyId, page, pageSize);
   res.json(data);
 }
 

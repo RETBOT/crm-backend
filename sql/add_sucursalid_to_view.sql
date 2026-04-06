@@ -19,8 +19,8 @@ SELECT
     c.status AS ESTATUS,
     b.branch_id AS SUCURSALID,
     b.branch_name AS SUCURSAL,
-    r.route_id AS RUTAID,
-    r.route_name AS RUTA,
+    r.vendedor_id AS VENDEDORID,
+    r.vendedor_name AS VENDEDOR,
     c.latitude AS LAT,
     c.longitude AS LON,
     c.net_sales_3m AS VENTA_NETA,
@@ -37,6 +37,6 @@ SELECT
 FROM crm.customers c
 LEFT JOIN crm.branches b
   ON b.company_id = c.company_id AND b.branch_id = c.branch_id
-LEFT JOIN crm.routes r
-  ON r.company_id = c.company_id AND r.route_id = c.route_id;
+LEFT JOIN crm.vendedores r
+  ON r.company_id = c.company_id AND r.vendedor_id = c.route_id;
 GO

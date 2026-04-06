@@ -43,7 +43,7 @@ src/
 │   ├── activities/             # CRUD de actividades
 │   ├── admin/                  # Gestión de usuarios, roles, permisos, alcance
 │   ├── auth/                   # Login, JWT, permisos, recuperación de contraseña
-│   ├── catalog/                # Catálogos: sucursales, rutas, puestos
+│   ├── catalog/                # Catálogos: sucursales, vendedores, puestos
 │   ├── customers/              # CRUD de clientes, prospectos y contactos
 │   ├── dashboard/              # Panel de control: KPIs, gráficos, alertas
 │   ├── notifications/          # Notificaciones del sistema
@@ -142,7 +142,7 @@ src/
 | Método | Ruta | Permiso | Descripción |
 |--------|------|---------|-------------|
 | POST | `/api/cn/sucursal` | Auth | Listar sucursales |
-| POST | `/api/cn/rutas` | Auth | Listar rutas |
+| POST | `/api/cn/vendedores` | Auth | Listar vendedores |
 | POST | `/api/cn/puestos` | Auth | Listar puestos |
 
 ### Administración
@@ -163,7 +163,7 @@ src/
 | PUT | `/api/admin/permissions/:id` | roles.manage | Actualizar permiso |
 | DELETE | `/api/admin/permissions/:id` | roles.manage | Eliminar permiso |
 | GET | `/api/admin/branches` | users.manage/roles.manage/scope.manage | Listar sucursales |
-| GET | `/api/admin/routes` | users.manage/roles.manage/scope.manage | Listar rutas |
+| GET | `/api/admin/routes` | users.manage/roles.manage/scope.manage | Listar vendedores |
 | GET | `/api/admin/users/:id/scope` | scope.manage | Ver alcance de usuario |
 | PUT | `/api/admin/users/:id/scope` | scope.manage | Actualizar alcance de usuario |
 
@@ -361,7 +361,7 @@ El sistema incluye un módulo completo de reportes con:
 - **RETEX** = estructura y control · **RETFlow** = ejecución y movimiento
 - Los responses mantienen compatibilidad con el frontend (`regresa`, `mensaje`, `resultado`, `msg`, `tot_pags`)
 - `APP_SECRET_KEY` se usa para desencriptar payloads AES del frontend
-- El alcance de datos filtra clientes/sucursales/rutas según configuración por usuario (ALL/BRANCH/ROUTE)
+- El alcance de datos filtra clientes/sucursales/vendedores según configuración por usuario (ALL/BRANCH/ROUTE)
 - Las actividades cambian de status automáticamente: si se asigna fecha pasa a "Programada", si se quita vuelve a "Pendiente"
 - El servicio de email usa nodemailer con SMTP (configurado para Gmail con App Password)
 - Los tokens de recuperación expiran en 1 hora y son de un solo uso

@@ -33,18 +33,18 @@ BEGIN
 END
 GO
 
-IF OBJECT_ID('sec.user_route_access', 'U') IS NULL
+IF OBJECT_ID('sec.user_vendedor_access', 'U') IS NULL
 BEGIN
-  CREATE TABLE sec.user_route_access (
+  CREATE TABLE sec.user_vendedor_access (
     company_id   INT          NOT NULL,
     user_id      INT          NOT NULL,
-    route_id     INT          NOT NULL,
-    created_at   DATETIME2(0) NOT NULL CONSTRAINT DF_user_route_access_created_at DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT PK_user_route_access PRIMARY KEY (company_id, user_id, route_id),
-    CONSTRAINT FK_user_route_access_user FOREIGN KEY (company_id, user_id)
+    vendedor_id  INT          NOT NULL,
+    created_at   DATETIME2(0) NOT NULL CONSTRAINT DF_user_vendedor_access_created_at DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_user_vendedor_access PRIMARY KEY (company_id, user_id, vendedor_id),
+    CONSTRAINT FK_user_vendedor_access_user FOREIGN KEY (company_id, user_id)
       REFERENCES sec.users(company_id, user_id),
-    CONSTRAINT FK_user_route_access_route FOREIGN KEY (company_id, route_id)
-      REFERENCES crm.routes(company_id, route_id)
+    CONSTRAINT FK_user_vendedor_access_vendedor FOREIGN KEY (company_id, vendedor_id)
+      REFERENCES crm.vendedores(company_id, vendedor_id)
   );
 END
 GO
@@ -56,9 +56,9 @@ BEGIN
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_user_route_access_lookup')
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_user_vendedor_access_lookup')
 BEGIN
-  CREATE INDEX IX_user_route_access_lookup
-    ON sec.user_route_access(company_id, user_id, route_id);
+  CREATE INDEX IX_user_vendedor_access_lookup
+    ON sec.user_vendedor_access(company_id, user_id, vendedor_id);
 END
 GO

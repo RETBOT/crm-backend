@@ -55,30 +55,50 @@ export async function listRoles(companyId: number) {
   return Array.from(map.values());
 }
 
-export async function listUsers(companyId: number) {
+export async function listUsers(companyId: number, page: number = 1, pageSize: number = 50) {
   const pool = await getPool();
-  const result = await pool.request().input("company_id", sql.Int, companyId).query(`
-    SELECT
-      u.user_id,
-      u.username,
-      u.display_name,
-      u.email,
-      u.is_active,
-      u.is_multi_branch,
-      u.default_branch_id,
-      b.branch_name,
-      u.last_login_at,
-      r.role_id,
-      r.role_name
-    FROM sec.users u
-    LEFT JOIN crm.branches b
-      ON b.company_id = u.company_id
-     AND b.branch_id = u.default_branch_id
-    LEFT JOIN sec.user_roles ur ON ur.user_id = u.user_id
-    LEFT JOIN sec.roles r ON r.role_id = ur.role_id
-    WHERE u.company_id = @company_id
-    ORDER BY u.username, r.role_name;
-  `);
+  const offset = (page - 1) * pageSize;
+
+  const countResult = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .query(`
+      SELECT COUNT(DISTINCT u.user_id) AS total
+      FROM sec.users u
+      WHERE u.company_id = @company_id;
+    `);
+
+  const total = countResult.recordset[0]?.total ?? 0;
+  const totalPages = pageSize > 0 ? Math.ceil(total / pageSize) : 1;
+
+  const result = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("offset", sql.Int, offset)
+    .input("pageSize", sql.Int, pageSize)
+    .query(`
+      SELECT
+        u.user_id,
+        u.username,
+        u.display_name,
+        u.email,
+        u.is_active,
+        u.is_multi_branch,
+        u.default_branch_id,
+        b.branch_name,
+        u.last_login_at,
+        r.role_id,
+        r.role_name
+      FROM sec.users u
+      LEFT JOIN crm.branches b
+        ON b.company_id = u.company_id
+       AND b.branch_id = u.default_branch_id
+      LEFT JOIN sec.user_roles ur ON ur.user_id = u.user_id
+      LEFT JOIN sec.roles r ON r.role_id = ur.role_id
+      WHERE u.company_id = @company_id
+      ORDER BY u.username, r.role_name
+      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+    `);
 
   const map = new Map<number, any>();
 
@@ -103,7 +123,11 @@ export async function listUsers(companyId: number) {
     }
   }
 
-  return Array.from(map.values());
+  return {
+    data: Array.from(map.values()),
+    tot_pags: totalPages,
+    total_regs: total,
+  };
 }
 
 export async function listAdminBranches(companyId: number) {
@@ -128,8 +152,8 @@ export async function listAdminRoutes(companyId: number, branchIds: number[] = [
     .input("company_id", sql.Int, companyId)
     .input("branch_ids_csv", sql.VarChar(sql.MAX), branchIdsCsv)
     .query(`
-      SELECT route_id, route_code, route_name, branch_id, status
-      FROM crm.routes
+      SELECT vendedor_id, route_code, route_name, branch_id, status
+      FROM crm.vendedores
       WHERE company_id = @company_id
         AND status = 'ACTIVO'
         AND (
@@ -165,9 +189,9 @@ export async function getUserScopeConfig(companyId: number, userId: number) {
       .request()
       .input("company_id", sql.Int, companyId)
       .input("user_id", sql.Int, userId)
-      .query<{ route_id: number }>(`
-        SELECT route_id
-        FROM sec.user_route_access
+      .query<{ vendedor_id: number }>(`
+        SELECT vendedor_id
+        FROM sec.user_vendedor_access
         WHERE company_id = @company_id
           AND user_id = @user_id;
       `),
@@ -176,7 +200,7 @@ export async function getUserScopeConfig(companyId: number, userId: number) {
   return {
     scope_type: scope.scopeType,
     branch_ids: branchesResult.recordset.map((b) => b.branch_id),
-    route_ids: routesResult.recordset.map((r) => r.route_id),
+    route_ids: routesResult.recordset.map((r) => r.vendedor_id),
     effective_branch_ids: scope.branchIds,
     effective_route_ids: scope.routeIds,
   };
@@ -207,7 +231,7 @@ export async function upsertUserScope(companyId: number, userId: number, input: 
     }
 
     if (input.scope_type === "ROUTE" && input.route_ids.length === 0) {
-      throw new HttpError(400, "Debe seleccionar al menos una ruta para alcance por ruta");
+      throw new HttpError(400, "Debe seleccionar al menos un vendedor para alcance por vendedor");
     }
 
     if (input.branch_ids.length > 0) {
@@ -237,9 +261,9 @@ export async function upsertUserScope(companyId: number, userId: number, input: 
         .input("branch_ids_csv", sql.VarChar(sql.MAX), input.branch_ids.join(","))
         .query<{ total: number }>(`
           SELECT COUNT(1) AS total
-          FROM crm.routes
+          FROM crm.vendedores
           WHERE company_id = @company_id
-            AND route_id IN (
+            AND vendedor_id IN (
               SELECT TRY_CAST(value AS INT)
               FROM STRING_SPLIT(@route_ids_csv, ',')
               WHERE TRY_CAST(value AS INT) IS NOT NULL
@@ -255,7 +279,7 @@ export async function upsertUserScope(companyId: number, userId: number, input: 
         `);
 
       if ((validRoutes.recordset[0]?.total || 0) !== input.route_ids.length) {
-        throw new HttpError(400, "Una o más rutas no son válidas o no pertenecen a las sucursales seleccionadas");
+        throw new HttpError(400, "Uno o más vendedores no son válidos o no pertenecen a las sucursales seleccionadas");
       }
     }
 
@@ -282,7 +306,7 @@ export async function upsertUserScope(companyId: number, userId: number, input: 
         WHERE company_id = @company_id
           AND user_id = @user_id;
 
-        DELETE FROM sec.user_route_access
+        DELETE FROM sec.user_vendedor_access
         WHERE company_id = @company_id
           AND user_id = @user_id;
       `);
@@ -305,10 +329,10 @@ export async function upsertUserScope(companyId: number, userId: number, input: 
         await new sql.Request(tx)
           .input("company_id", sql.Int, companyId)
           .input("user_id", sql.Int, userId)
-          .input("route_id", sql.Int, routeId)
+          .input("vendedor_id", sql.Int, routeId)
           .query(`
-            INSERT INTO sec.user_route_access (company_id, user_id, route_id, created_at)
-            VALUES (@company_id, @user_id, @route_id, SYSUTCDATETIME());
+            INSERT INTO sec.user_vendedor_access (company_id, user_id, vendedor_id, created_at)
+            VALUES (@company_id, @user_id, @vendedor_id, SYSUTCDATETIME());
           `);
       }
     }

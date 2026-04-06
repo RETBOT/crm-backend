@@ -13,6 +13,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - OAuth2 con Google (Gmail API, Calendar API) y Microsoft (Graph API) para autenticacion de cuentas de correo
 - Endpoints de email: `POST /api/email/connect`, `POST /api/email/send`, `GET /api/email/history`, `GET /api/email/accounts`, `DELETE /api/email/disconnect/:provider`, `GET /api/email/oauth-status`
 - Endpoints de calendario: `POST /api/calendar/sync`, `GET /api/calendar/events`, `POST /api/calendar/create-activity`
+
+### Changed
+- **Renombrar ruta a vendedor**: Cambiado nomenclatura de "ruta" a "vendedor" en todo el sistema
+  - Tabla `crm.routes` renombrada a `crm.vendedores`
+  - Columnas `route_id` → `vendedor_id`, `route_name` → `vendedor_name`
+  - Vista `api.vw_cn_rutas` renombrada a `api.vw_cn_vendedores`
+  - Endpoint `/api/cn/rutas` → `/api/cn/vendedores`
+  - Actualizado frontend: accounts.jsx, prospects.jsx, maps.jsx, customerform.jsx
+  - Actualizado backend: queries SQL en admin.service, catalog.controller, scope.service, reports.service
+
+- **Paginacion**: endpoint `POST /api/cn/contactos` ahora acepta `NPAG` y `TPAG` y retorna `{ data, tot_pags, total_regs }` en vez de array plano
+- **Paginacion**: endpoint `GET /api/admin/users` ahora acepta `page` y `pageSize` como query params y retorna `{ data, tot_pags, total_regs }` en vez de array plano
 - Endpoints de email avanzado: `GET/POST/PUT/DELETE /api/email-advanced/templates`, `POST /api/email-advanced/send-with-template`, `GET/PUT /api/email-advanced/signature`, `GET /api/email-advanced/tracking-stats`, `GET /api/email-advanced/track/open/:emailId`, `POST /api/email-advanced/track/click`
 - Tablas nuevas: `sec.user_email_accounts`, `crm.email_sent`, `crm.calendar_sync`, `crm.external_events`, `crm.email_templates`, `crm.email_tracking`, `sec.user_signatures`
 - Renovacion automatica de tokens OAuth2 (access_token y refresh_token)

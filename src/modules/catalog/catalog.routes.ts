@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { getPuestos, getRutas, getSucursales } from "./catalog.controller";
+import { getPuestos, getVendedores, getSucursales } from "./catalog.controller";
 
 const router = Router();
 
 router.post("/sucursal", getSucursales);
-router.post("/rutas", getRutas);
+router.post("/vendedores", getVendedores);
 router.post("/puestos", getPuestos);
 
 export { router as catalogRoutes };

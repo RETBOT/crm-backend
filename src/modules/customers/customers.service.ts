@@ -109,7 +109,7 @@ export async function listCustomers(companyId: number, userId: number, input: Cu
         AND NOMBRECLI LIKE @nombre
         AND (@sucursal = '' OR SUCURSALID = @sucursal)
         AND (@estatus = '' OR ESTATUS = @estatus)
-        AND (@ruta = '' OR CAST(RUTAID AS VARCHAR(50)) = @ruta)
+        AND (@ruta = '' OR CAST(VENDEDORID AS VARCHAR(50)) = @ruta)
         ${whereTipo};
     `);
 
@@ -145,7 +145,7 @@ export async function listCustomers(companyId: number, userId: number, input: Cu
         AND NOMBRECLI LIKE @nombre
         AND (@sucursal = '' OR SUCURSALID = @sucursal)
         AND (@estatus = '' OR ESTATUS = @estatus)
-        AND (@ruta = '' OR CAST(RUTAID AS VARCHAR(50)) = @ruta)
+        AND (@ruta = '' OR CAST(VENDEDORID AS VARCHAR(50)) = @ruta)
         ${whereTipo}
       ORDER BY NOMBRECLI
       OFFSET @offset ROWS FETCH NEXT @page_size ROWS ONLY;
@@ -177,14 +177,45 @@ export async function listContacts(companyId: number, userId: number, input: Con
   }
 
   const whereCustomer = resolvedCustomerId ? "AND v.customer_id = @customer_id" : "";
+  const page = input.NPAG ?? 1;
+  const pageSize = input.TPAG ?? 50;
+  const offset = (page - 1) * pageSize;
 
-  const result = await pool
+  const countResult = await pool
     .request()
     .input("company_id", sql.Int, companyId)
     .input("scope_type", sql.VarChar(10), scope.scopeType)
     .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
     .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
     .input("customer_id", sql.Int, resolvedCustomerId)
+    .query(`
+      SELECT COUNT(*) AS total
+      FROM api.vw_cn_contactos v
+      INNER JOIN crm.customers c ON c.company_id = v.company_id AND c.customer_id = v.customer_id
+      WHERE v.company_id = @company_id
+        ${whereCustomer}
+        AND EXISTS (
+          SELECT 1
+          FROM crm.customers cscope
+          WHERE cscope.company_id = v.company_id
+            AND cscope.customer_id = v.customer_id
+            AND ${buildScopeConditionSql("cscope")}
+        )
+        AND v.is_active = 1;
+    `);
+
+  const total = countResult.recordset[0]?.total ?? 0;
+  const totalPages = pageSize > 0 ? Math.ceil(total / pageSize) : 1;
+
+  const dataResult = await pool
+    .request()
+    .input("company_id", sql.Int, companyId)
+    .input("scope_type", sql.VarChar(10), scope.scopeType)
+    .input("branch_ids_csv", sql.VarChar(sql.MAX), scope.branchIdsCsv)
+    .input("route_ids_csv", sql.VarChar(sql.MAX), scope.routeIdsCsv)
+    .input("customer_id", sql.Int, resolvedCustomerId)
+    .input("offset", sql.Int, offset)
+    .input("pageSize", sql.Int, pageSize)
     .query(`
       SELECT v.ID, c.customer_id, v.CLIENTEID, c.customer_name AS NOMBRECLI, v.NOMBRE, v.APATERNO, v.AMATERNO,
              v.TELEFONO, v.EXTENSION, v.PUESTOID, v.PUESTO, v.COMENTARIOS, v.WHATSAPP, v.EMAIL
@@ -200,10 +231,15 @@ export async function listContacts(companyId: number, userId: number, input: Con
             AND ${buildScopeConditionSql("cscope")}
         )
         AND v.is_active = 1
-      ORDER BY c.customer_name, v.NOMBRE, v.APATERNO;
+      ORDER BY c.customer_name, v.NOMBRE, v.APATERNO
+      OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
     `);
 
-  return result.recordset;
+  return {
+    data: dataResult.recordset,
+    tot_pags: totalPages,
+    total_regs: total,
+  };
 }
 
 export async function contactsAbc(companyId: number, userId: number, input: ContactsAbcInput): Promise<string> {
@@ -326,7 +362,7 @@ export async function customersAbc(companyId: number, userId: number, input: Cus
 
       if (scope.scopeType === "ROUTE") {
         if (!routeId || !scope.routeIds.includes(routeId)) {
-          throw new HttpError(403, "No tiene acceso a la ruta seleccionada");
+          throw new HttpError(403, "No tiene acceso al vendedor seleccionado");
         }
       }
     }

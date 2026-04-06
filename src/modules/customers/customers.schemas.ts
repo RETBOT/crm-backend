@@ -13,6 +13,8 @@ export const customersSchema = z.object({
 
 export const contactsSchema = z.object({
   CLIENTEID: z.union([z.string(), z.number()]).optional().nullable().transform((v) => v != null ? String(v) : ""),
+  NPAG: z.coerce.number().optional().default(1).refine((v) => !isNaN(v) && v > 0, { message: "NPAG debe ser un número positivo" }),
+  TPAG: z.coerce.number().optional().default(50).refine((v) => !isNaN(v) && v >= 0, { message: "TPAG debe ser un número válido" }),
 });
 
 export const contactsAbcSchema = z.object({

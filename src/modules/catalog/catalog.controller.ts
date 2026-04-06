@@ -41,7 +41,7 @@ export async function getSucursales(req: Request, res: Response): Promise<void> 
   res.json(result.recordset);
 }
 
-export async function getRutas(req: Request, res: Response): Promise<void> {
+export async function getVendedores(req: Request, res: Response): Promise<void> {
   const { DESCRIPCION } = querySchema.parse(req.body ?? {});
   const companyId = req.auth!.companyId;
   const userId = req.auth!.userId;
@@ -57,9 +57,9 @@ export async function getRutas(req: Request, res: Response): Promise<void> {
     .input("branch_id", sql.Int, Number(DESCRIPCION) || null)
     .query(`
       SELECT ID, DSC, SUCURSALID
-      FROM api.vw_cn_rutas
+      FROM api.vw_cn_vendedores
       WHERE ID IN (
-        SELECT route_id FROM crm.routes WHERE company_id = @company_id
+        SELECT vendedor_id FROM crm.vendedores WHERE company_id = @company_id
       )
       AND (
         @scope_type = 'ALL'

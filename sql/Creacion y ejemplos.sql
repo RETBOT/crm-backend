@@ -177,21 +177,21 @@ GO
 /* ============================================================
    4) Sales Structure
    ============================================================ */
-CREATE TABLE crm.routes (
-    route_id                   int             IDENTITY(1,1) PRIMARY KEY,
+CREATE TABLE crm.vendedores (
+    vendedor_id                int             IDENTITY(1,1) PRIMARY KEY,
     company_id                 int             NOT NULL,
     branch_id                  int             NOT NULL,
-    route_code                 varchar(20)     NOT NULL,
-    route_name                 nvarchar(140)   NOT NULL,
+    vendedor_code              varchar(20)     NOT NULL,
+    vendedor_name              nvarchar(140)   NOT NULL,
     assigned_user_id           int             NULL,
-    status                     varchar(10)     NOT NULL CONSTRAINT CK_routes_status CHECK (status IN ('ACTIVO','INACTIVO')),
-    created_at                 datetime2(0)    NOT NULL CONSTRAINT DF_routes_created DEFAULT SYSUTCDATETIME(),
-    updated_at                 datetime2(0)    NOT NULL CONSTRAINT DF_routes_updated DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT FK_routes_company FOREIGN KEY (company_id) REFERENCES sec.companies(company_id),
-    CONSTRAINT FK_routes_branch FOREIGN KEY (company_id, branch_id) REFERENCES crm.branches(company_id, branch_id),
-    CONSTRAINT FK_routes_user FOREIGN KEY (company_id, assigned_user_id) REFERENCES sec.users(company_id, user_id),
-    CONSTRAINT UQ_routes_company_branch_code UNIQUE (company_id, branch_id, route_code),
-    CONSTRAINT UQ_routes_company_routeid UNIQUE (company_id, route_id)
+    status                     varchar(10)     NOT NULL CONSTRAINT CK_vendedores_status CHECK (status IN ('ACTIVO','INACTIVO')),
+    created_at                 datetime2(0)    NOT NULL CONSTRAINT DF_vendedores_created DEFAULT SYSUTCDATETIME(),
+    updated_at                 datetime2(0)    NOT NULL CONSTRAINT DF_vendedores_updated DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT FK_vendedores_company FOREIGN KEY (company_id) REFERENCES sec.companies(company_id),
+    CONSTRAINT FK_vendedores_branch FOREIGN KEY (company_id, branch_id) REFERENCES crm.branches(company_id, branch_id),
+    CONSTRAINT FK_vendedores_user FOREIGN KEY (company_id, assigned_user_id) REFERENCES sec.users(company_id, user_id),
+    CONSTRAINT UQ_vendedores_company_branch_code UNIQUE (company_id, branch_id, vendedor_code),
+    CONSTRAINT UQ_vendedores_company_vendedorid UNIQUE (company_id, vendedor_id)
 );
 GO
 
@@ -240,7 +240,7 @@ CREATE TABLE crm.customers (
 
     CONSTRAINT FK_customers_company FOREIGN KEY (company_id) REFERENCES sec.companies(company_id),
     CONSTRAINT FK_customers_branch FOREIGN KEY (company_id, branch_id) REFERENCES crm.branches(company_id, branch_id),
-    CONSTRAINT FK_customers_route FOREIGN KEY (company_id, route_id) REFERENCES crm.routes(company_id, route_id),
+    CONSTRAINT FK_customers_vendedor FOREIGN KEY (company_id, route_id) REFERENCES crm.vendedores(company_id, vendedor_id),
     CONSTRAINT FK_customers_created_by FOREIGN KEY (company_id, created_by_user_id) REFERENCES sec.users(company_id, user_id),
     CONSTRAINT FK_customers_updated_by FOREIGN KEY (company_id, updated_by_user_id) REFERENCES sec.users(company_id, user_id),
     CONSTRAINT CK_customers_email CHECK (email IS NULL OR email LIKE '%_@_%._%'),
@@ -514,14 +514,14 @@ FROM crm.branches b
 WHERE b.status = 'ACTIVO';
 GO
 
-CREATE VIEW api.vw_cn_rutas
+CREATE VIEW api.vw_cn_vendedores
 AS
 SELECT
-    r.route_id AS ID,
-    r.route_name AS DSC,
-    r.branch_id AS SUCURSALID
-FROM crm.routes r
-WHERE r.status = 'ACTIVO';
+    v.vendedor_id AS ID,
+    v.vendedor_name AS DSC,
+    v.branch_id AS SUCURSALID
+FROM crm.vendedores v
+WHERE v.status = 'ACTIVO';
 GO
 
 CREATE VIEW api.vw_cn_clientes
@@ -541,8 +541,8 @@ SELECT
     c.phone AS TEL,
     c.status AS ESTATUS,
     b.branch_name AS SUCURSAL,
-    r.route_id AS RUTAID,
-    r.route_name AS RUTA,
+    r.vendedor_id AS VENDEDORID,
+    r.vendedor_name AS VENDEDOR,
     c.latitude AS LAT,
     c.longitude AS LON,
     c.net_sales_3m AS VENTA_NETA,
@@ -559,8 +559,8 @@ SELECT
 FROM crm.customers c
 LEFT JOIN crm.branches b
   ON b.company_id = c.company_id AND b.branch_id = c.branch_id
-LEFT JOIN crm.routes r
-  ON r.company_id = c.company_id AND r.route_id = c.route_id;
+LEFT JOIN crm.vendedores r
+  ON r.company_id = c.company_id AND r.vendedor_id = c.route_id;
 GO
 
 CREATE VIEW api.vw_cn_contactos
@@ -646,17 +646,17 @@ DECLARE @user_sal int = (SELECT user_id FROM sec.users WHERE company_id=@company
 DECLARE @user_qro int = (SELECT user_id FROM sec.users WHERE company_id=@company_id AND username='usr_qro');
 DECLARE @user_mty int = (SELECT user_id FROM sec.users WHERE company_id=@company_id AND username='usr_mty');
 
-INSERT INTO crm.routes (company_id, branch_id, route_code, route_name, assigned_user_id, status) VALUES
-(@company_id, @branch_lag, 'R-101', N'RUTA LAGUNA NORTE', @user_lag, 'ACTIVO'),
-(@company_id, @branch_lag, 'R-102', N'RUTA LAGUNA SUR', @user_lag, 'ACTIVO'),
-(@company_id, @branch_sal, 'R-201', N'RUTA SALTILLO CENTRO', @user_sal, 'ACTIVO'),
-(@company_id, @branch_qro, 'R-301', N'RUTA QUERETARO INDUSTRIAL', @user_qro, 'ACTIVO'),
-(@company_id, @branch_mty, 'R-401', N'RUTA MONTERREY ORIENTE', @user_mty, 'ACTIVO');
+INSERT INTO crm.vendedores (company_id, branch_id, vendedor_code, vendedor_name, assigned_user_id, status) VALUES
+(@company_id, @branch_lag, 'R-101', N'VENDEDOR LAGUNA NORTE', @user_lag, 'ACTIVO'),
+(@company_id, @branch_lag, 'R-102', N'VENDEDOR LAGUNA SUR', @user_lag, 'ACTIVO'),
+(@company_id, @branch_sal, 'R-201', N'VENDEDOR SALTILLO CENTRO', @user_sal, 'ACTIVO'),
+(@company_id, @branch_qro, 'R-301', N'VENDEDOR QUERETARO INDUSTRIAL', @user_qro, 'ACTIVO'),
+(@company_id, @branch_mty, 'R-401', N'VENDEDOR MONTERREY ORIENTE', @user_mty, 'ACTIVO');
 
-DECLARE @route_lag_n int = (SELECT route_id FROM crm.routes WHERE company_id=@company_id AND route_code='R-101');
-DECLARE @route_sal_c int = (SELECT route_id FROM crm.routes WHERE company_id=@company_id AND route_code='R-201');
-DECLARE @route_qro_i int = (SELECT route_id FROM crm.routes WHERE company_id=@company_id AND route_code='R-301');
-DECLARE @route_mty_o int = (SELECT route_id FROM crm.routes WHERE company_id=@company_id AND route_code='R-401');
+DECLARE @vendedor_lag_n int = (SELECT vendedor_id FROM crm.vendedores WHERE company_id=@company_id AND vendedor_code='R-101');
+DECLARE @vendedor_sal_c int = (SELECT vendedor_id FROM crm.vendedores WHERE company_id=@company_id AND vendedor_code='R-201');
+DECLARE @vendedor_qro_i int = (SELECT vendedor_id FROM crm.vendedores WHERE company_id=@company_id AND vendedor_code='R-301');
+DECLARE @vendedor_mty_o int = (SELECT vendedor_id FROM crm.vendedores WHERE company_id=@company_id AND vendedor_code='R-401');
 
 INSERT INTO crm.customers (
     company_id, customer_code, customer_name, customer_type, business_line, status, branch_id, route_id,
@@ -664,27 +664,27 @@ INSERT INTO crm.customers (
     net_sales_3m, margin_pct, credit_line, exercised_amount, overdue_amount, avg_overdue_days,
     inactive_cv, order_hold, hold_reason, insurance_status, created_by_user_id, updated_by_user_id
 ) VALUES
-(@company_id, '100001', N'SUMITOMO ELECTRIC WIRING SYSTEMS, INC.', 'CLIENTE', N'AUTOMOTRIZ', 'ACTIVO', @branch_lag, @route_lag_n,
+(@company_id, '100001', N'SUMITOMO ELECTRIC WIRING SYSTEMS, INC.', 'CLIENTE', N'AUTOMOTRIZ', 'ACTIVO', @branch_lag, @vendedor_lag_n,
  N'AV INDUSTRIA', N'1200', N'PARQUE INDUSTRIAL', N'TORREON', N'COAHUILA', '27000',
  N'compras@sumitomo.demo', '8717307940', 25.539000, -103.445300,
  450000.00, 18.50, 300000.00, 180000.00, 0.00, 0, 0, 0, NULL, N'VIGENTE', @admin_user, @admin_user),
 
-(@company_id, '100002', N'WHIRLPOOL INTERNACIONAL', 'CLIENTE', N'LINEA BLANCA', 'ACTIVO', @branch_sal, @route_sal_c,
+(@company_id, '100002', N'WHIRLPOOL INTERNACIONAL', 'CLIENTE', N'LINEA BLANCA', 'ACTIVO', @branch_sal, @vendedor_sal_c,
  N'BLVD INDUSTRIAL', N'455', N'PARQUE NORTE', N'SALTILLO', N'COAHUILA', '25230',
  N'sourcing@whirlpool.demo', '8448664585', 25.426700, -100.995000,
  280000.00, 16.10, 220000.00, 140000.00, 12000.00, 24, 0, 0, NULL, N'VIGENTE', @admin_user, @admin_user),
 
-(@company_id, '100003', N'NIPPON STEEL PIPE MEXICO S.A. DE C.V.', 'CLIENTE', N'METALMECANICA', 'ACTIVO', @branch_qro, @route_qro_i,
+(@company_id, '100003', N'NIPPON STEEL PIPE MEXICO S.A. DE C.V.', 'CLIENTE', N'METALMECANICA', 'ACTIVO', @branch_qro, @vendedor_qro_i,
  N'CARRETERA 57', N'KM12', N'ZONA INDUSTRIAL', N'QUERETARO', N'QUERETARO', '76000',
  N'compras@nippon.demo', '4421234567', 20.588800, -100.389900,
  320000.00, 19.40, 250000.00, 165000.00, 0.00, 0, 0, 0, NULL, N'VIGENTE', @admin_user, @admin_user),
 
-(@company_id, '100004', N'BADAFI', 'CLIENTE', N'ALIMENTOS', 'ACTIVO', @branch_mty, @route_mty_o,
+(@company_id, '100004', N'BADAFI', 'CLIENTE', N'ALIMENTOS', 'ACTIVO', @branch_mty, @vendedor_mty_o,
  N'AV CONSTITUCION', N'850', N'CENTRO', N'MONTERREY', N'NUEVO LEON', '64000',
  N'compras@badafi.demo', '8188880000', 25.686600, -100.316100,
  95000.00, 12.20, 100000.00, 85000.00, 15000.00, 36, 1, 1, N'DOCUMENTACION INCOMPLETA', N'NO APLICA', @admin_user, @admin_user),
 
-(@company_id, '200001', N'ARNECOM', 'PROSPECTO', N'AUTOPARTES', 'ACTIVO', @branch_mty, @route_mty_o,
+(@company_id, '200001', N'ARNECOM', 'PROSPECTO', N'AUTOPARTES', 'ACTIVO', @branch_mty, @vendedor_mty_o,
  N'AV TECNOLOGICO', N'300', N'INDUSTRIAL', N'MONTERREY', N'NUEVO LEON', '64500',
  N'contacto@arnecom.demo', '8180001111', 25.700000, -100.350000,
  NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, @admin_user, @admin_user);
@@ -771,7 +771,7 @@ VALUES (@company_id, @admin_user, 'SEED', 'database', 'initial', N'{"status":"ok
 /* ============================================================
    8) Helpful Indexes
    ============================================================ */
-CREATE INDEX IX_routes_company_branch ON crm.routes(company_id, branch_id, status);
+CREATE INDEX IX_vendedores_company_branch ON crm.vendedores(company_id, branch_id, status);
 CREATE INDEX IX_users_company_active ON sec.users(company_id, is_active, username);
 CREATE INDEX IX_quotes_company_status ON crm.quotations(company_id, status, issue_date);
 CREATE INDEX IX_docs_company_customer ON crm.documents(company_id, customer_id, uploaded_at);
