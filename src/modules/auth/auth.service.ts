@@ -231,6 +231,7 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
 
   await pool.request()
     .input("user_id", sql.Int, tokenRecord.user_id)
+    .input("token_hash", sql.NVarChar(255), tokenHash)
     .query(`
       UPDATE sec.password_reset_tokens
       SET used_at = SYSUTCDATETIME()

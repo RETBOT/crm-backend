@@ -147,12 +147,24 @@ export async function listAdminRoutes(companyId: number, branchIds: number[] = [
   const pool = await getPool();
   const branchIdsCsv = branchIds.join(",");
 
+  const hasVendedorCode = await pool
+    .request()
+    .query(`
+      SELECT 1 AS exists_flag
+      FROM sys.columns 
+      WHERE object_id = OBJECT_ID('crm.vendedores') AND name = 'vendedor_code'
+    `);
+
+  const selectClause = hasVendedorCode.recordset.length > 0
+    ? `vendedor_id, COALESCE(vendedor_code, 'V-' + CAST(vendedor_id AS VARCHAR(10))) AS vendedor_code, COALESCE(vendedor_name, 'Vendedor ' + CAST(vendedor_id AS VARCHAR(10))) AS vendedor_name`
+    : `vendedor_id, 'V-' + CAST(vendedor_id AS VARCHAR(10)) AS vendedor_code, COALESCE(vendedor_name, 'Vendedor ' + CAST(vendedor_id AS VARCHAR(10))) AS vendedor_name`;
+
   const result = await pool
     .request()
     .input("company_id", sql.Int, companyId)
     .input("branch_ids_csv", sql.VarChar(sql.MAX), branchIdsCsv)
     .query(`
-      SELECT vendedor_id, route_code, route_name, branch_id, status
+      SELECT ${selectClause}, branch_id, status
       FROM crm.vendedores
       WHERE company_id = @company_id
         AND status = 'ACTIVO'
@@ -164,7 +176,7 @@ export async function listAdminRoutes(companyId: number, branchIds: number[] = [
             WHERE TRY_CAST(value AS INT) IS NOT NULL
           )
         )
-      ORDER BY route_name;
+      ORDER BY COALESCE(vendedor_name, 'Vendedor');
     `);
 
   return result.recordset;

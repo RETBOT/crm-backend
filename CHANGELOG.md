@@ -7,6 +7,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Migracion `20260411_add_vendedor_code.sql`: agrega columna `vendedor_code` a tabla `crm.vendedores` si no existe
+
+### Fixed
+- **Auth - Reset password**: variable `@token_hash` no estaba declarada en query UPDATE de password_reset_tokens (auth.service.ts)
+- **Admin - Listar rutas/vendedores**: query corregido para usar columnas renombradas (`vendedor_name`, `vendedor_code` en vez de `route_name`, `route_code`)
+- **Admin - vendedor_code inexistente**: query dinamico que detecta si columna existe antes de seleccionarla
+
+### Changed
+
+### Fixed
+
+### Added
 - Modulo completo de email integration: enviar correos desde Gmail y Outlook sin salir del CRM
 - Modulo completo de calendar integration: sincronizar Google Calendar y Outlook Calendar con el CRM
 - Modulo de email avanzado: plantillas, tracking de apertura/clics, firmas de usuario
